@@ -17,6 +17,10 @@
     "Saving...": "Saving...",
     "Slug: :slug": "Slug: :slug",
     "Switched active organization.": "Switched active organization.",
+    "Tenant created successfully.": "Tenant created successfully.",
+    "Tenant deleted successfully.": "Tenant deleted successfully.",
+    "Tenant status updated successfully.": "Tenant status updated successfully.",
+    "Tenant updated successfully.": "Tenant updated successfully.",
     "This user is already a member of this organization.": "This user is already a member of this organization.",
     "You are not a member of this organization.": "You are not a member of this organization.",
     "You have view-only access to this organization profile.": "You have view-only access to this organization profile."
