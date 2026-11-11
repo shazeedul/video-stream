@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('panel')
     ->as('portal.')
-    ->middleware(['auth', 'verified', 'default.panel'])
+    ->middleware(['auth', 'verified', 'default.panel', 'tenant.context'])
     ->group(function (): void {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
