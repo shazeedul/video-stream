@@ -36,6 +36,8 @@ final class CreateHelperCommand extends Command
      */
     public function handle(): void
     {
+        $this->config = Config::get('helpers_generator') ?? $this->config;
+
         $name = $this->getHelperName();
         $path = $this->getHelperPath();
 
@@ -107,7 +109,11 @@ final class CreateHelperCommand extends Command
     private function normalizePath(string $path): string
     {
         // If path is relative, make it absolute from base_path
-        if (! str_starts_with($path, '/')) {
+        $isAbsolute = str_starts_with($path, '/')
+            || str_starts_with($path, '\\')
+            || (mb_strlen($path) > 1 && ctype_alpha($path[0]) && $path[1] === ':');
+
+        if (! $isAbsolute) {
             $path = base_path($path);
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Tenants\Models\Tenant;
 use App\Enums\TenantRole;
+use App\Enums\TenantUserStatus;
 use App\Models\User;
 
 test('platform admin can view and update any tenant', function (): void {
@@ -77,4 +78,34 @@ test('authenticated user can create tenant', function (): void {
     $user = User::factory()->create();
 
     expect($user->can('create', Tenant::class))->toBeTrue();
+});
+
+test('suspended member cannot perform actions authorized by tenant policy', function (): void {
+    $user = User::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($user->id, [
+        'id' => (string) str()->uuid(),
+        'role' => TenantRole::OWNER->value,
+        'status' => TenantUserStatus::SUSPENDED->value,
+    ]);
+
+    expect($user->can('view', $tenant))->toBeFalse()
+        ->and($user->can('update', $tenant))->toBeFalse()
+        ->and($user->can('delete', $tenant))->toBeFalse()
+        ->and($user->can('manageMembers', $tenant))->toBeFalse();
+});
+
+test('invited member cannot perform actions authorized by tenant policy', function (): void {
+    $user = User::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($user->id, [
+        'id' => (string) str()->uuid(),
+        'role' => TenantRole::ADMIN->value,
+        'status' => TenantUserStatus::INVITED->value,
+    ]);
+
+    expect($user->can('view', $tenant))->toBeFalse()
+        ->and($user->can('update', $tenant))->toBeFalse()
+        ->and($user->can('delete', $tenant))->toBeFalse()
+        ->and($user->can('manageMembers', $tenant))->toBeFalse();
 });

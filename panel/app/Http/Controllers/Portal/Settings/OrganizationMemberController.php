@@ -88,6 +88,10 @@ final class OrganizationMemberController extends Controller
         /** @var string $role */
         $role = $request->validated('role');
 
+        if ($role === TenantRole::OWNER->value && ! $user->isTenantOwner($currentTenant) && ! $user->can('tenants.update')) {
+            abort(403, __('Only organization owners can manage owner accounts.'));
+        }
+
         $targetUser = User::query()->where('email', $email)->firstOrFail();
 
         $currentTenant->users()->attach($targetUser->id, [
@@ -126,6 +130,12 @@ final class OrganizationMemberController extends Controller
         $isOwner = $membership->role instanceof TenantRole
             ? $membership->role->isOwner()
             : $membership->role === TenantRole::OWNER->value;
+
+        $isPromotingToOwner = $newRole === TenantRole::OWNER->value;
+
+        if (($isOwner || $isPromotingToOwner) && ! $user->isTenantOwner($currentTenant) && ! $user->can('tenants.update')) {
+            abort(403, __('Only organization owners can manage owner accounts.'));
+        }
 
         if ($isOwner && $newRole !== TenantRole::OWNER->value) {
             $otherOwnersCount = $currentTenant->memberships()
@@ -172,6 +182,10 @@ final class OrganizationMemberController extends Controller
             : $membership->role === TenantRole::OWNER->value;
 
         if ($isOwner) {
+            if (! $user->isTenantOwner($currentTenant) && ! $user->can('tenants.update')) {
+                abort(403, __('Only organization owners can manage owner accounts.'));
+            }
+
             $otherOwnersCount = $currentTenant->memberships()
                 ->where('role', TenantRole::OWNER)
                 ->where('id', '!=', $membership->id)

@@ -104,3 +104,69 @@ test('context service getActiveTenant returns container bound instance or resolv
     expect($service->getActiveTenant($user)->id)->toBe($otherTenant->id);
     expect($service->getActiveTenant(null)->id)->toBe($otherTenant->id);
 });
+
+test('user in a suspended tenant who belongs to another active tenant can switch to active tenant', function (): void {
+    $user = User::factory()->create();
+    $suspendedTenant = Tenant::factory()->create(['status' => TenantStatus::SUSPENDED]);
+    $activeTenant = Tenant::factory()->create(['status' => TenantStatus::ACTIVE]);
+
+    $suspendedTenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+    $activeTenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    $response = $this->actingAs($user)
+        ->withSession(['current_tenant_id' => $suspendedTenant->id])
+        ->post(route('portal.tenants.switch', $activeTenant));
+
+    $response->assertRedirect();
+    $response->assertSessionHas('success');
+    expect(session('current_tenant_id'))->toBe($activeTenant->id);
+});
+
+test('user cannot switch into a suspended tenant', function (): void {
+    $user = User::factory()->create();
+    $activeTenant = Tenant::factory()->create(['status' => TenantStatus::ACTIVE]);
+    $suspendedTenant = Tenant::factory()->create(['status' => TenantStatus::SUSPENDED]);
+
+    $activeTenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+    $suspendedTenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    $response = $this->actingAs($user)
+        ->withSession(['current_tenant_id' => $activeTenant->id])
+        ->post(route('portal.tenants.switch', $suspendedTenant));
+
+    $response->assertRedirect();
+    $response->assertSessionHas('error', __('Cannot switch to a suspended organization.'));
+    expect(session('current_tenant_id'))->toBe($activeTenant->id);
+});
+
+test('context service automatically switches to active tenant when session tenant is suspended', function (): void {
+    $user = User::factory()->create();
+    $suspendedTenant = Tenant::factory()->create(['status' => TenantStatus::SUSPENDED]);
+    $activeTenant = Tenant::factory()->create(['status' => TenantStatus::ACTIVE]);
+
+    $suspendedTenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+    $activeTenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    session(['current_tenant_id' => $suspendedTenant->id]);
+
+    $service = app(TenantContextService::class);
+    $resolved = $service->getCurrentTenant($user);
+
+    expect($resolved->id)->toBe($activeTenant->id)
+        ->and(session('current_tenant_id'))->toBe($activeTenant->id);
+});
+
+test('context service retains suspended tenant when user has no other active tenants', function (): void {
+    $user = User::factory()->create();
+    $suspendedTenant = Tenant::factory()->create(['status' => TenantStatus::SUSPENDED]);
+
+    $suspendedTenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    session(['current_tenant_id' => $suspendedTenant->id]);
+
+    $service = app(TenantContextService::class);
+    $resolved = $service->getCurrentTenant($user);
+
+    expect($resolved->id)->toBe($suspendedTenant->id)
+        ->and(session('current_tenant_id'))->toBe($suspendedTenant->id);
+});

@@ -23,6 +23,10 @@ final class TenantSwitchController extends Controller
             abort(403, __('You are not a member of this organization.'));
         }
 
+        if ($tenant->status->isSuspended()) {
+            return back()->with('error', __('Cannot switch to a suspended organization.'));
+        }
+
         $switched = $contextService->setCurrentTenant($user, $tenant);
 
         if (! $switched) {
