@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Portal\DashboardController;
 use App\Http\Controllers\Portal\NotificationController;
+use App\Http\Controllers\Portal\Settings\OrganizationController;
 use App\Http\Controllers\Portal\Settings\PasswordController;
 use App\Http\Controllers\Portal\Settings\ProfileController;
 use App\Http\Controllers\Portal\Settings\UserPreferencesController;
+use App\Http\Controllers\Portal\TenantSwitchController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('panel')
@@ -14,6 +16,11 @@ Route::prefix('panel')
     ->middleware(['auth', 'verified', 'default.panel', 'tenant.context'])
     ->group(function (): void {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        /*
+         * Tenant switcher routes
+         */
+        Route::post('tenants/switch/{tenant}', [TenantSwitchController::class, 'switch'])->name('tenants.switch');
 
         /*
          * Notification routes
@@ -41,6 +48,10 @@ Route::prefix('panel')
             Route::get('profile', [ProfileController::class, 'overview'])->middleware('permission:profile.view')->name('profile.overview');
             Route::get('profile/edit', [ProfileController::class, 'edit'])->middleware('permission:profile.edit')->name('profile.edit');
             Route::patch('profile', [ProfileController::class, 'update'])->middleware('permission:profile.edit')->name('profile.update');
+
+            // Organization routes
+            Route::get('organization', [OrganizationController::class, 'overview'])->name('organization.overview');
+            Route::put('organization', [OrganizationController::class, 'update'])->name('organization.update');
 
             // Account deletion routes
             Route::get('profile/delete', [ProfileController::class, 'delete'])->middleware('permission:profile.delete')->name('profile.delete');
