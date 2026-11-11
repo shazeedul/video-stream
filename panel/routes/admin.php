@@ -51,8 +51,7 @@ Route::prefix('panel/admin')
             Route::post('/', [RoleController::class, 'store'])->middleware('permission:roles.create')->name('store');
             Route::get('{role}', [RoleController::class, 'show'])->name('show');
             Route::get('{role}/edit', [RoleController::class, 'edit'])->middleware('permission:roles.update')->name('edit');
-            Route::put('{role}', [RoleController::class, 'update'])->middleware('permission:roles.update')->name('update');
-            Route::patch('{role}', [RoleController::class, 'update'])->middleware('permission:roles.update');
+            Route::match(['put', 'patch'], '{role}', [RoleController::class, 'update'])->middleware('permission:roles.update')->name('update');
             Route::delete('{role}', [RoleController::class, 'destroy'])->middleware('permission:roles.delete')->name('destroy');
         });
 

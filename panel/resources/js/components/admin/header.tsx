@@ -1,5 +1,5 @@
-import { AdminMenuContent } from '@/components/admin/menu-content';
-import { AdminNotificationDropdown } from '@/components/admin/notification-dropdown';
+import { MenuContent } from '@/components/admin/menu-content';
+import { NotificationDropdown } from '@/components/admin/notification-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { GlobalSearch } from '@/components/global-search';
 import { Icon } from '@/components/icon';
@@ -351,7 +351,7 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
                                 </Tooltip>
                             </TooltipProvider>
                             <LanguageSwitcher />
-                            <AdminNotificationDropdown />
+                            <NotificationDropdown />
                             <div className="hidden lg:flex">
                                 {footerNavItems.map((item) => (
                                     <Can key={item.title} permission={item.permission ?? '*'}>
@@ -391,7 +391,7 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56" align="end">
-                                <AdminMenuContent user={auth.user} />
+                                <MenuContent user={auth.user} />
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>

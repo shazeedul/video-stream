@@ -50,3 +50,6 @@ export function MenuContent({ user }: MenuContentProps) {
         </>
     );
 }
+
+export { MenuContent as AdminMenuContent };
+

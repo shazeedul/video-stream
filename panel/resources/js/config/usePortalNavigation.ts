@@ -89,3 +89,6 @@ export function useSettingsNavigation(): NavItem[] {
     );
     return settingsNavigation;
 }
+
+export const useUserMainNavigation = usePortalMainNavigation;
+

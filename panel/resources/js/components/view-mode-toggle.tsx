@@ -73,11 +73,11 @@ export function useViewMode(storageKey: string = 'view-mode', defaultMode: ViewM
         };
 
         window.addEventListener('storage', handleStorageChange);
-        window.addEventListener('viewModeChange', handleViewModeChange);
+        window.addEventListener('viewModeChange', handleViewModeChange as EventListener);
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
-            window.removeEventListener('viewModeChange', handleViewModeChange);
+            window.removeEventListener('viewModeChange', handleViewModeChange as EventListener);
         };
     }, [storageKey]);
 

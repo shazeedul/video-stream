@@ -149,3 +149,6 @@ export interface User extends BaseModel {
     status_updated_at: string | null;
     [key: string]: unknown;
 }
+
+export * from './tenant';
+
