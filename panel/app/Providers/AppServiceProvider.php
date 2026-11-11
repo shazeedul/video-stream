@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Tenants\Models\Tenant;
+use App\Policies\TenantPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -13,7 +15,7 @@ final class AppServiceProvider extends ServiceProvider
      * The policy mappings for the application.
      */
     private array $policies = [
-        //
+        Tenant::class => TenantPolicy::class,
     ];
 
     /**

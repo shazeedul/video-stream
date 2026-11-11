@@ -64,6 +64,34 @@ final class RolePermissions
                     'roles' => ['admin'],
                 ],
             ],
+            // Tenants
+            'Tenants' => [
+                [
+                    'name' => 'tenants.view',
+                    'display_name' => 'View Tenants',
+                    'roles' => ['admin'],
+                ],
+                [
+                    'name' => 'tenants.create',
+                    'display_name' => 'Create Tenants',
+                    'roles' => ['admin'],
+                ],
+                [
+                    'name' => 'tenants.update',
+                    'display_name' => 'Update Tenants',
+                    'roles' => ['admin'],
+                ],
+                [
+                    'name' => 'tenants.suspend',
+                    'display_name' => 'Suspend Tenants',
+                    'roles' => ['admin'],
+                ],
+                [
+                    'name' => 'tenants.delete',
+                    'display_name' => 'Delete Tenants',
+                    'roles' => ['admin'],
+                ],
+            ],
             'Users' => [
                 [
                     'name' => 'users.view',
