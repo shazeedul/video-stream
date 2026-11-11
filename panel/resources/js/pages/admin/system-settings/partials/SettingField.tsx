@@ -20,8 +20,8 @@ export function SettingField({ setting, onChange }: SettingFieldProps) {
 
     // Text-based inputs
     if (
-        [SystemSettingType.TEXT, SystemSettingType.EMAIL, SystemSettingType.NUMBER, SystemSettingType.URL, SystemSettingType.TEL].includes(
-            type as SystemSettingType,
+        ([SystemSettingType.TEXT, SystemSettingType.EMAIL, SystemSettingType.NUMBER, SystemSettingType.URL, SystemSettingType.TEL] as string[]).includes(
+            type,
         )
     ) {
         return <TextField setting={setting} onChange={onChange} />;
@@ -29,8 +29,8 @@ export function SettingField({ setting, onChange }: SettingFieldProps) {
 
     // Date/Time inputs
     if (
-        [SystemSettingType.DATE, SystemSettingType.TIME, SystemSettingType.DATETIME_LOCAL, SystemSettingType.MONTH, SystemSettingType.WEEK].includes(
-            type as SystemSettingType,
+        ([SystemSettingType.DATE, SystemSettingType.TIME, SystemSettingType.DATETIME_LOCAL, SystemSettingType.MONTH, SystemSettingType.WEEK] as string[]).includes(
+            type,
         )
     ) {
         return <DateTimeField setting={setting} onChange={onChange} />;

@@ -18,3 +18,6 @@ export default function AdminLayout({ children, breadcrumbs, ...props }: Readonl
         </SidebarLayout>
     );
 }
+
+export { useAdminMainNavigation } from '@/config/useAdminNavigation';
+

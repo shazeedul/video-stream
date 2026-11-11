@@ -4,10 +4,11 @@ import { edit as editPassword } from '@/routes/admin/settings/password';
 import { index as preferencesIndex } from '@/routes/admin/settings/preferences';
 import { deleteMethod as deleteProfile, edit as editProfile, overview as profileOverview } from '@/routes/admin/settings/profile';
 import { index as settingsIndex } from '@/routes/admin/system-settings';
+import { index as tenantsIndex } from '@/routes/admin/tenants';
 import { index as usersIndex } from '@/routes/admin/users';
 import { type NavGroup, type NavItem } from '@/types';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
-import { Cog, Edit, LayoutGrid, Lock, Settings, Settings as SettingsIcon, Shield, Trash2, User as UserIcon, Users } from 'lucide-react';
+import { Building2, Cog, Edit, LayoutGrid, Lock, Settings, Settings as SettingsIcon, Shield, Trash2, User as UserIcon, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function useAdminMainNavigation() {
@@ -35,6 +36,13 @@ export function useAdminMainNavigation() {
                         href: '#',
                         icon: Settings,
                         items: [
+                            {
+                                title: __('Tenants'),
+                                href: tenantsIndex(),
+                                icon: Building2,
+                                permission: 'tenants.view',
+                                active_when: tenantsIndex().url + '*',
+                            },
                             {
                                 title: __('Roles'),
                                 href: rolesIndex(),
