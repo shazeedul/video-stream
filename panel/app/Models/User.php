@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Tenants\Models\TenantUser;
 use App\Enums\TenantRole;
+use App\Enums\TenantUserStatus;
 use App\Enums\UserStatus;
 use App\Traits\HasProfilePhoto;
 use App\Traits\HasSocialAuth;
@@ -106,6 +107,12 @@ final class User extends Authenticatable
         if ($this->relationLoaded('tenants')) {
             $loadedTenant = $this->tenants->firstWhere('id', $tenant->id);
             if ($loadedTenant !== null && $loadedTenant->pivot !== null) {
+                $status = $loadedTenant->pivot->status;
+                $statusEnum = $status instanceof TenantUserStatus ? $status : (is_string($status) ? TenantUserStatus::tryFrom($status) : null);
+                if ($statusEnum !== TenantUserStatus::ACTIVE) {
+                    return null;
+                }
+
                 $role = $loadedTenant->pivot->role;
 
                 return $role instanceof TenantRole ? $role : (is_string($role) ? TenantRole::tryFrom($role) : null);
@@ -115,6 +122,12 @@ final class User extends Authenticatable
         if ($this->relationLoaded('tenantMemberships')) {
             $membership = $this->tenantMemberships->firstWhere('tenant_id', $tenant->id);
             if ($membership !== null) {
+                $status = $membership->status;
+                $statusEnum = $status instanceof TenantUserStatus ? $status : (is_string($status) ? TenantUserStatus::tryFrom($status) : null);
+                if ($statusEnum !== TenantUserStatus::ACTIVE) {
+                    return null;
+                }
+
                 $role = $membership->role;
 
                 return $role instanceof TenantRole ? $role : (is_string($role) ? TenantRole::tryFrom($role) : null);
@@ -123,6 +136,12 @@ final class User extends Authenticatable
 
         $membership = $this->tenantMemberships()->where('tenant_id', $tenant->id)->first();
         if ($membership !== null) {
+            $status = $membership->status;
+            $statusEnum = $status instanceof TenantUserStatus ? $status : (is_string($status) ? TenantUserStatus::tryFrom($status) : null);
+            if ($statusEnum !== TenantUserStatus::ACTIVE) {
+                return null;
+            }
+
             $role = $membership->role;
 
             return $role instanceof TenantRole ? $role : (is_string($role) ? TenantRole::tryFrom($role) : null);

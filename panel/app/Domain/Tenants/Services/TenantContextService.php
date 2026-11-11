@@ -10,6 +10,7 @@ use App\Enums\TenantRole;
 use App\Enums\TenantStatus;
 use App\Enums\TenantUserStatus;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 final class TenantContextService implements TenantContextServiceInterface
@@ -26,6 +27,20 @@ final class TenantContextService implements TenantContextServiceInterface
             $sessionTenant = Tenant::query()->find($sessionTenantId);
 
             if ($sessionTenant !== null && ! $sessionTenant->trashed() && $user->isTenantMember($sessionTenant)) {
+                if ($sessionTenant->status->isSuspended()) {
+                    /** @var Tenant|null $activeTenant */
+                    $activeTenant = $user->tenants()
+                        ->where('tenants.id', '!=', $sessionTenant->id)
+                        ->where('tenants.status', TenantStatus::ACTIVE)
+                        ->first();
+
+                    if ($activeTenant !== null) {
+                        session(['current_tenant_id' => $activeTenant->id]);
+
+                        return $activeTenant;
+                    }
+                }
+
                 return $sessionTenant;
             }
 
@@ -62,17 +77,21 @@ final class TenantContextService implements TenantContextServiceInterface
             $slug = Str::slug("{$name}-team-".Str::lower(Str::random(5)));
         }
 
-        $tenant = Tenant::query()->create([
-            'name' => "{$name}'s Team",
-            'slug' => $slug,
-            'status' => TenantStatus::ACTIVE,
-        ]);
+        $tenant = DB::transaction(function () use ($user, $name, $slug): Tenant {
+            $tenant = Tenant::query()->create([
+                'name' => "{$name}'s Team",
+                'slug' => $slug,
+                'status' => TenantStatus::ACTIVE,
+            ]);
 
-        $tenant->users()->attach($user->id, [
-            'id' => (string) Str::uuid(),
-            'role' => TenantRole::OWNER->value,
-            'status' => TenantUserStatus::ACTIVE->value,
-        ]);
+            $tenant->users()->attach($user->id, [
+                'id' => (string) Str::uuid(),
+                'role' => TenantRole::OWNER->value,
+                'status' => TenantUserStatus::ACTIVE->value,
+            ]);
+
+            return $tenant;
+        });
 
         $user->unsetRelation('tenants');
         session(['current_tenant_id' => $tenant->id]);

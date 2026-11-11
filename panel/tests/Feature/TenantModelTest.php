@@ -44,6 +44,8 @@ test('tenant scopes filter active and search by name or slug', function (): void
         ->and(Tenant::query()->active()->pluck('id'))->not->toContain($suspended->id);
 
     expect(Tenant::query()->search('Alpha')->pluck('id'))->toContain($active->id)
+        ->and(Tenant::query()->search('alpha')->pluck('id'))->toContain($active->id)
+        ->and(Tenant::query()->search('BETA')->pluck('id'))->toContain($suspended->id)
         ->and(Tenant::query()->search('beta-media')->pluck('id'))->toContain($suspended->id)
         ->and(Tenant::query()->search('NonExistent')->count())->toBe(0);
 });
@@ -76,4 +78,46 @@ test('user tenant helper methods return expected values when not a member', func
     expect($unrelatedUser->isTenantOwner($tenant))->toBeFalse()
         ->and($unrelatedUser->isTenantMember($tenant))->toBeFalse()
         ->and($unrelatedUser->tenantRole($tenant))->toBeNull();
+});
+
+test('user with suspended membership returns null for tenantRole and false for isTenantMember and isTenantOwner', function (): void {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create();
+
+    $tenant->users()->attach($user->id, [
+        'id' => (string) str()->uuid(),
+        'role' => TenantRole::OWNER->value,
+        'status' => TenantUserStatus::SUSPENDED->value,
+    ]);
+
+    expect($user->tenantRole($tenant))->toBeNull()
+        ->and($user->isTenantMember($tenant))->toBeFalse()
+        ->and($user->isTenantOwner($tenant))->toBeFalse();
+
+    // Verify when relation is loaded
+    $userWithRelation = User::query()->with('tenants')->find($user->id);
+    expect($userWithRelation->tenantRole($tenant))->toBeNull()
+        ->and($userWithRelation->isTenantMember($tenant))->toBeFalse()
+        ->and($userWithRelation->isTenantOwner($tenant))->toBeFalse();
+});
+
+test('user with invited membership returns null for tenantRole and false for isTenantMember and isTenantOwner', function (): void {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create();
+
+    $tenant->users()->attach($user->id, [
+        'id' => (string) str()->uuid(),
+        'role' => TenantRole::ADMIN->value,
+        'status' => TenantUserStatus::INVITED->value,
+    ]);
+
+    expect($user->tenantRole($tenant))->toBeNull()
+        ->and($user->isTenantMember($tenant))->toBeFalse()
+        ->and($user->isTenantOwner($tenant))->toBeFalse();
+
+    // Verify when relation is loaded
+    $userWithRelation = User::query()->with('tenants')->find($user->id);
+    expect($userWithRelation->tenantRole($tenant))->toBeNull()
+        ->and($userWithRelation->isTenantMember($tenant))->toBeFalse()
+        ->and($userWithRelation->isTenantOwner($tenant))->toBeFalse();
 });

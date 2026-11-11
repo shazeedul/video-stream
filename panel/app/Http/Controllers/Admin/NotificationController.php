@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Notifications\GeneralNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,7 +31,11 @@ final class NotificationController extends Controller
         }
 
         if ($level && $level !== 'all') {
-            $query->where('data->level', $level);
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                $query->whereRaw("(\"data\"::jsonb->>'level') = ?", [$level]);
+            } else {
+                $query->where('data->level', $level);
+            }
         }
 
         return Inertia::render('admin/notifications/index', [

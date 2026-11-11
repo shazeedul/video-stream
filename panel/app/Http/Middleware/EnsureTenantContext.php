@@ -28,7 +28,7 @@ final class EnsureTenantContext
             $tenant = $this->tenantContextService->getCurrentTenant($user);
 
             if ($tenant !== null) {
-                if ($tenant->status->isSuspended()) {
+                if ($tenant->status->isSuspended() && ! $request->routeIs('portal.tenants.switch')) {
                     abort(403, __('Your organization has been suspended. Please contact support.'));
                 }
 

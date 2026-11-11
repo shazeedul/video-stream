@@ -189,3 +189,118 @@ test('authorized user can view organization members list', function (): void {
 
     $response->assertOk();
 });
+
+test('tenant admin cannot add user with owner role', function (): void {
+    $owner = User::factory()->create();
+    $admin = User::factory()->create();
+    $newUser = User::factory()->create(['email' => 'newowner@example.com']);
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($owner->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+    $tenant->users()->attach($admin->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::ADMIN->value]);
+
+    session(['current_tenant_id' => $tenant->id]);
+
+    $response = $this->actingAs($admin)->post(route('portal.settings.organization.members.store'), [
+        'email' => 'newowner@example.com',
+        'role' => TenantRole::OWNER->value,
+    ]);
+
+    $response->assertForbidden();
+    expect($tenant->users()->where('users.id', $newUser->id)->exists())->toBeFalse();
+});
+
+test('tenant admin cannot promote member to owner', function (): void {
+    $owner = User::factory()->create();
+    $admin = User::factory()->create();
+    $member = User::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($owner->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+    $tenant->users()->attach($admin->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::ADMIN->value]);
+    $tenant->users()->attach($member->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    $pivotMember = $tenant->memberships()->where('user_id', $member->id)->first();
+
+    session(['current_tenant_id' => $tenant->id]);
+
+    $response = $this->actingAs($admin)->patch(route('portal.settings.organization.members.update', $pivotMember), [
+        'role' => TenantRole::OWNER->value,
+    ]);
+
+    $response->assertForbidden();
+    expect($pivotMember->fresh()->role)->toBe(TenantRole::MEMBER);
+});
+
+test('tenant admin cannot demote an owner', function (): void {
+    $owner1 = User::factory()->create();
+    $owner2 = User::factory()->create();
+    $admin = User::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($owner1->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+    $tenant->users()->attach($owner2->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+    $tenant->users()->attach($admin->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::ADMIN->value]);
+
+    $pivotOwner2 = $tenant->memberships()->where('user_id', $owner2->id)->first();
+
+    session(['current_tenant_id' => $tenant->id]);
+
+    $response = $this->actingAs($admin)->patch(route('portal.settings.organization.members.update', $pivotOwner2), [
+        'role' => TenantRole::MEMBER->value,
+    ]);
+
+    $response->assertForbidden();
+    expect($pivotOwner2->fresh()->role)->toBe(TenantRole::OWNER);
+});
+
+test('tenant admin cannot remove an owner', function (): void {
+    $owner1 = User::factory()->create();
+    $owner2 = User::factory()->create();
+    $admin = User::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($owner1->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+    $tenant->users()->attach($owner2->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+    $tenant->users()->attach($admin->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::ADMIN->value]);
+
+    $pivotOwner2 = $tenant->memberships()->where('user_id', $owner2->id)->first();
+
+    session(['current_tenant_id' => $tenant->id]);
+
+    $response = $this->actingAs($admin)->delete(route('portal.settings.organization.members.destroy', $pivotOwner2));
+
+    $response->assertForbidden();
+    expect($tenant->users()->where('users.id', $owner2->id)->exists())->toBeTrue();
+});
+
+test('tenant admin can add, update, and remove regular members', function (): void {
+    $owner = User::factory()->create();
+    $admin = User::factory()->create();
+    $member = User::factory()->create();
+    $newUser = User::factory()->create(['email' => 'regular@example.com']);
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($owner->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+    $tenant->users()->attach($admin->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::ADMIN->value]);
+    $tenant->users()->attach($member->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    $pivotMember = $tenant->memberships()->where('user_id', $member->id)->first();
+
+    session(['current_tenant_id' => $tenant->id]);
+
+    // Admin can add a regular member
+    $response = $this->actingAs($admin)->post(route('portal.settings.organization.members.store'), [
+        'email' => 'regular@example.com',
+        'role' => TenantRole::MEMBER->value,
+    ]);
+    $response->assertRedirect();
+    expect($tenant->users()->where('users.id', $newUser->id)->exists())->toBeTrue();
+
+    // Admin can update a regular member's role (not to owner)
+    $response = $this->actingAs($admin)->patch(route('portal.settings.organization.members.update', $pivotMember), [
+        'role' => TenantRole::VIEWER->value,
+    ]);
+    $response->assertRedirect();
+    expect($pivotMember->fresh()->role)->toBe(TenantRole::VIEWER);
+
+    // Admin can remove a regular member
+    $response = $this->actingAs($admin)->delete(route('portal.settings.organization.members.destroy', $pivotMember));
+    $response->assertRedirect();
+    expect($tenant->users()->where('users.id', $member->id)->exists())->toBeFalse();
+});

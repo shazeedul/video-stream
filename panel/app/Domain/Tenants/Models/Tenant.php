@@ -74,8 +74,8 @@ final class Tenant extends Model
         $term = mb_trim($term);
 
         return $query->where(function (Builder $builder) use ($term): void {
-            $builder->where('name', 'like', "%{$term}%")
-                ->orWhere('slug', 'like', "%{$term}%");
+            $builder->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($term).'%'])
+                ->orWhereRaw('LOWER(slug) LIKE ?', ['%'.mb_strtolower($term).'%']);
         });
     }
 
