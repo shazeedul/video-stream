@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Tenants\Services;
 
+use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
 use App\Enums\TenantRole;
 use App\Enums\TenantStatus;
@@ -11,7 +12,7 @@ use App\Enums\TenantUserStatus;
 use App\Models\User;
 use Illuminate\Support\Str;
 
-class TenantContextService
+final class TenantContextService implements TenantContextServiceInterface
 {
     /**
      * Resolve the current tenant for the given user.

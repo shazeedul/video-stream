@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Portal;
 
+use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
-use App\Domain\Tenants\Services\TenantContextService;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -17,7 +17,7 @@ final class UpdateOrganizationRequest extends FormRequest
      */
     public function currentTenant(): ?Tenant
     {
-        return app(TenantContextService::class)->getActiveTenant($this->user());
+        return app(TenantContextServiceInterface::class)->getActiveTenant($this->user());
     }
 
     /**

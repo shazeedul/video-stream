@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Portal\Settings;
 
-use App\Domain\Tenants\Services\TenantContextService;
+use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Enums\TenantStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Portal\UpdateOrganizationRequest;
@@ -18,7 +18,7 @@ final class OrganizationController extends Controller
     /**
      * Show the organization overview / settings page.
      */
-    public function overview(Request $request, TenantContextService $contextService): Response
+    public function overview(Request $request, TenantContextServiceInterface $contextService): Response
     {
         $currentTenant = $contextService->getActiveTenant($request->user());
 

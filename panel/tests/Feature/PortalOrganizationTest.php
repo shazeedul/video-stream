@@ -116,10 +116,10 @@ test('switching tenant flashes error when setCurrentTenant returns false', funct
     $tenant = Tenant::factory()->create();
     $tenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
 
-    $mockContextService = Mockery::mock(App\Domain\Tenants\Services\TenantContextService::class);
+    $mockContextService = Mockery::mock(App\Domain\Tenants\Contracts\TenantContextServiceInterface::class);
     $mockContextService->shouldReceive('getCurrentTenant')->andReturn($tenant);
     $mockContextService->shouldReceive('setCurrentTenant')->andReturn(false);
-    app()->instance(App\Domain\Tenants\Services\TenantContextService::class, $mockContextService);
+    app()->instance(App\Domain\Tenants\Contracts\TenantContextServiceInterface::class, $mockContextService);
 
     $response = $this->actingAs($user)->post(route('portal.tenants.switch', $tenant));
 
