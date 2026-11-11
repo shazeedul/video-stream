@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\Settings\PasswordController;
 use App\Http\Controllers\Admin\Settings\ProfileController;
 use App\Http\Controllers\Admin\Settings\UserPreferencesController;
 use App\Http\Controllers\Admin\SystemSettingController;
+use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +54,18 @@ Route::prefix('panel/admin')
             Route::put('{role}', [RoleController::class, 'update'])->middleware('permission:roles.update')->name('update');
             Route::patch('{role}', [RoleController::class, 'update'])->middleware('permission:roles.update');
             Route::delete('{role}', [RoleController::class, 'destroy'])->middleware('permission:roles.delete')->name('destroy');
+        });
+
+        /*
+         * tenants routes
+         */
+        Route::prefix('tenants')->name('tenants.')->middleware('permission:tenants.view')->group(function (): void {
+            Route::get('/', [TenantController::class, 'index'])->name('index');
+            Route::post('/', [TenantController::class, 'store'])->middleware('permission:tenants.create')->name('store');
+            Route::get('/{tenant}', [TenantController::class, 'show'])->name('show');
+            Route::put('/{tenant}', [TenantController::class, 'update'])->middleware('permission:tenants.update')->name('update');
+            Route::patch('/{tenant}/status', [TenantController::class, 'updateStatus'])->middleware('permission:tenants.suspend')->name('status');
+            Route::delete('/{tenant}', [TenantController::class, 'destroy'])->middleware('permission:tenants.delete')->name('destroy');
         });
 
         /*
