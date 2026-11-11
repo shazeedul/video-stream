@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Portal;
 
+use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
-use App\Domain\Tenants\Services\TenantContextService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +15,7 @@ final class TenantSwitchController extends Controller
     /**
      * Switch the active organization context.
      */
-    public function switch(Request $request, Tenant $tenant, TenantContextService $contextService): RedirectResponse
+    public function switch(Request $request, Tenant $tenant, TenantContextServiceInterface $contextService): RedirectResponse
     {
         $user = $request->user();
 

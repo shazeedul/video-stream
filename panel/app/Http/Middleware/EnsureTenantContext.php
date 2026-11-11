@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Domain\Tenants\Services\TenantContextService;
+use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Enums\TenantStatus;
 use Closure;
 use Illuminate\Http\Request;
@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 final class EnsureTenantContext
 {
     public function __construct(
-        private readonly TenantContextService $tenantContextService,
+        private readonly TenantContextServiceInterface $tenantContextService,
     ) {}
 
     /**
