@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Tenants\Models\Tenant;
+use App\Domain\Tenants\Models\TenantUser;
+use App\Enums\TenantRole;
 use App\Enums\UserStatus;
 use App\Traits\HasProfilePhoto;
 use App\Traits\HasSocialAuth;
 use App\Traits\HasUserPreferences;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -57,6 +61,74 @@ final class User extends Authenticatable
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(SocialAccount::class);
+    }
+
+    /**
+     * Get the tenants that the user belongs to.
+     */
+    public function tenants(): BelongsToMany
+    {
+        return $this->belongsToMany(Tenant::class, 'tenant_user')
+            ->using(TenantUser::class)
+            ->withPivot(['id', 'role', 'status'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the tenant memberships for the user.
+     */
+    public function tenantMemberships(): HasMany
+    {
+        return $this->hasMany(TenantUser::class, 'user_id');
+    }
+
+    /**
+     * Check if the user is an owner of the given tenant.
+     */
+    public function isTenantOwner(Tenant $tenant): bool
+    {
+        return $this->tenantRole($tenant)?->isOwner() ?? false;
+    }
+
+    /**
+     * Check if the user is a member of the given tenant.
+     */
+    public function isTenantMember(Tenant $tenant): bool
+    {
+        return $this->tenantRole($tenant) !== null;
+    }
+
+    /**
+     * Get the user's role in the given tenant.
+     */
+    public function tenantRole(Tenant $tenant): ?TenantRole
+    {
+        if ($this->relationLoaded('tenants')) {
+            $loadedTenant = $this->tenants->firstWhere('id', $tenant->id);
+            if ($loadedTenant !== null && $loadedTenant->pivot !== null) {
+                $role = $loadedTenant->pivot->role;
+
+                return $role instanceof TenantRole ? $role : (is_string($role) ? TenantRole::tryFrom($role) : null);
+            }
+        }
+
+        if ($this->relationLoaded('tenantMemberships')) {
+            $membership = $this->tenantMemberships->firstWhere('tenant_id', $tenant->id);
+            if ($membership !== null) {
+                $role = $membership->role;
+
+                return $role instanceof TenantRole ? $role : (is_string($role) ? TenantRole::tryFrom($role) : null);
+            }
+        }
+
+        $membership = $this->tenantMemberships()->where('tenant_id', $tenant->id)->first();
+        if ($membership !== null) {
+            $role = $membership->role;
+
+            return $role instanceof TenantRole ? $role : (is_string($role) ? TenantRole::tryFrom($role) : null);
+        }
+
+        return null;
     }
 
     /**
