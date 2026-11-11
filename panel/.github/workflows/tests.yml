@@ -1,0 +1,172 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - '**.php'
+      - '**.js'
+      - '**.jsx'
+      - '**.ts'
+      - '**.tsx'
+      - '**.vue'
+      - 'composer.json'
+      - 'composer.lock'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'phpunit.xml'
+      - 'tests/**'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    branches:
+      - dev
+      - main
+    paths:
+      - '**.php'
+      - '**.js'
+      - '**.jsx'
+      - '**.ts'
+      - '**.tsx'
+      - '**.vue'
+      - 'composer.json'
+      - 'composer.lock'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'phpunit.xml'
+      - 'tests/**'
+      - '.github/workflows/tests.yml'
+
+# Cancel in-progress runs for the same workflow and branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          tools: composer:v2
+          coverage: none
+          extensions: sqlite3
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v6
+        with:
+          path: vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Install Composer Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Cache pnpm Dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install pnpm Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Assets
+        run: pnpm run build
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-assets
+          path: public/build
+          retention-days: 1
+
+      - name: Setup Database
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          mkdir -p database
+          touch database/database.sqlite
+          php artisan migrate --force
+
+      - name: Upload Database
+        uses: actions/upload-artifact@v7
+        with:
+          name: database
+          path: database/database.sqlite
+          retention-days: 1
+
+  test:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - { name: 'Feature-1', type: 'Feature', shard: '1/4' }
+          - { name: 'Feature-2', type: 'Feature', shard: '2/4' }
+          - { name: 'Feature-3', type: 'Feature', shard: '3/4' }
+          - { name: 'Feature-4', type: 'Feature', shard: '4/4' }
+          - { name: 'Unit', type: 'Unit', shard: '1/1' }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          tools: composer:v2
+          coverage: none
+          extensions: sqlite3
+
+      - name: Cache Composer Dependencies
+        uses: actions/cache@v6
+        with:
+          path: vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Install Composer Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Download Build Artifacts
+        if: matrix.suite.type == 'Feature'
+        uses: actions/download-artifact@v8
+        with:
+          name: build-assets
+          path: public/build
+
+      - name: Download Database
+        uses: actions/download-artifact@v8
+        with:
+          name: database
+          path: database
+
+      - name: Setup Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run ${{ matrix.suite.name }} Tests
+        run: php artisan test --compact --testsuite=${{ matrix.suite.type }} --shard=${{ matrix.suite.shard }}

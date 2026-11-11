@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+CHANGELOG.md export-ignore
+README.md export-ignore
+.lefthook/** text eol=lf
+lefthook.yml text eol=lf

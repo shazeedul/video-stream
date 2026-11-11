@@ -1,0 +1,29 @@
+# Root .gitignore for monorepo
+
+# Local environment & secrets
+.env
+.env.backup
+.env.local
+
+# Superpowers SDD workspace
+.superpowers/
+
+# Node / JS
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Composer / PHP
+vendor/
+.phpunit.cache
+.phpunit.result.cache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
