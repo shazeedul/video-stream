@@ -4,6 +4,7 @@ import { Icon } from '@/components/icon';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { UserMenuContent } from '@/components/portal/menu-content';
 import { UserNotificationDropdown } from '@/components/portal/notification-dropdown';
+import { TenantSwitcher } from '@/components/tenant-switcher';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -158,6 +159,9 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
                                 <SheetHeader className="flex justify-start text-left">
                                     <AppLogo className="max-w-48 fill-current text-black dark:text-white" />
                                 </SheetHeader>
+                                <div className="px-4 pt-2">
+                                    <TenantSwitcher />
+                                </div>
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
                                     <div className="flex h-full flex-col justify-between text-sm">
                                         <div className="flex flex-col space-y-2">
@@ -242,9 +246,14 @@ export function Header({ breadcrumbs = [] }: HeaderProps) {
                         </Sheet>
                     </div>
 
-                    <Link href={dashboard()} prefetch className="flex items-center space-x-2">
-                        <AppLogo className="max-w-48" />
-                    </Link>
+                    <div className="flex items-center gap-3">
+                        <Link href={dashboard()} prefetch className="flex items-center space-x-2">
+                            <AppLogo className="max-w-48" />
+                        </Link>
+                        <div className="hidden sm:flex items-center">
+                            <TenantSwitcher />
+                        </div>
+                    </div>
                     {/* Desktop Navigation */}
                     <div className="ml-4 hidden h-full items-center space-x-6 lg:flex">
                         <NavigationMenu viewport={false} className="relative flex h-full items-stretch">
