@@ -42,6 +42,18 @@ final class EnsureTenantContext
                     'role' => $request->user()?->tenantRole($tenant)?->value,
                     'settings' => $tenant->settings,
                 ]);
+
+                Inertia::share('userTenants', fn () => $user->tenants()
+                    ->get(['tenants.id', 'tenants.name', 'tenants.slug', 'tenants.status'])
+                    ->map(fn ($t) => [
+                        'id' => $t->id,
+                        'name' => $t->name,
+                        'slug' => $t->slug,
+                        'status' => $t->status instanceof TenantStatus ? $t->status->value : (string) $t->status,
+                    ])
+                    ->values()
+                    ->all()
+                );
             }
         }
 

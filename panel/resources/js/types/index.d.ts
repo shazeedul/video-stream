@@ -67,6 +67,20 @@ export interface SharedData {
     flashMessages: FlashMessages;
     sidebarOpen: boolean;
     systemSettings: Record<string, SystemSettingValue>;
+    currentTenant?: {
+        id: string;
+        name: string;
+        slug: string;
+        status: string;
+        role?: string;
+        settings?: Record<string, unknown> | null;
+    };
+    userTenants?: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        status: string;
+    }>;
     [key: string]: unknown;
 }
 

@@ -1,10 +1,12 @@
 import { dashboard } from '@/routes/portal';
+import { overview as organizationOverview } from '@/routes/portal/settings/organization';
+import { index as organizationMembersIndex } from '@/routes/portal/settings/organization/members';
 import { edit as editPassword } from '@/routes/portal/settings/password';
 import { index as preferencesIndex } from '@/routes/portal/settings/preferences';
 import { deleteMethod as deleteProfile, edit as editProfile, overview as profileOverview } from '@/routes/portal/settings/profile';
 import { type NavGroup, type NavItem } from '@/types';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
-import { Edit, LayoutGrid, Lock, Settings as SettingsIcon, Trash2, User as UserIcon } from 'lucide-react';
+import { Building2, Edit, LayoutGrid, Lock, Settings as SettingsIcon, Trash2, User as UserIcon, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function usePortalMainNavigation() {
@@ -74,6 +76,25 @@ export function useSettingsNavigation(): NavItem[] {
                         icon: Trash2,
                         permission: 'profile.delete',
                         active_when: deleteProfile().url,
+                    },
+                ],
+            },
+            {
+                title: __('Organization'),
+                href: '#',
+                icon: Building2,
+                items: [
+                    {
+                        title: __('Overview'),
+                        href: organizationOverview(),
+                        icon: Building2,
+                        active_when: organizationOverview().url,
+                    },
+                    {
+                        title: __('Members'),
+                        href: organizationMembersIndex(),
+                        icon: Users,
+                        active_when: organizationMembersIndex().url + '*',
                     },
                 ],
             },

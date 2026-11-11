@@ -1,4 +1,5 @@
 import { FlashMessage } from '@/components/flash-message';
+import { TenantSwitcher } from '@/components/tenant-switcher';
 import { Toaster } from '@/components/ui/sonner';
 import { type BreadcrumbItem } from '@/types';
 import { type ReactNode } from 'react';
@@ -18,3 +19,5 @@ export default function PortalLayout({ children, breadcrumbs, ...props }: Readon
         </HeaderLayout>
     );
 }
+
+export { TenantSwitcher };
