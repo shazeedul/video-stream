@@ -14,6 +14,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
+/**
+ * @property string $id
+ * @property string $tenant_id
+ * @property int $user_id
+ * @property TenantRole $role
+ * @property TenantUserStatus $status
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read Tenant $tenant
+ * @property-read User|null $user
+ */
 #[Fillable([
     'id',
     'tenant_id',
