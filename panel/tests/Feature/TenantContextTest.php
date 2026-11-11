@@ -87,3 +87,20 @@ test('middleware binds current_tenant in container and shares currentTenant prop
         )
     );
 });
+
+test('context service getActiveTenant returns container bound instance or resolves from user', function (): void {
+    $user = User::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::OWNER->value]);
+
+    $service = app(TenantContextService::class);
+
+    // Without container binding, resolves from user
+    expect($service->getActiveTenant($user)->id)->toBe($tenant->id);
+
+    // With container binding, uses container instance
+    $otherTenant = Tenant::factory()->create();
+    app()->instance('current_tenant', $otherTenant);
+    expect($service->getActiveTenant($user)->id)->toBe($otherTenant->id);
+    expect($service->getActiveTenant(null)->id)->toBe($otherTenant->id);
+});

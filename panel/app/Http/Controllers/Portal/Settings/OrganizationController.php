@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Portal\Settings;
 
-use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Tenants\Services\TenantContextService;
 use App\Enums\TenantStatus;
 use App\Http\Controllers\Controller;
@@ -21,7 +20,7 @@ final class OrganizationController extends Controller
      */
     public function overview(Request $request, TenantContextService $contextService): Response
     {
-        $currentTenant = $this->resolveCurrentTenant($request, $contextService);
+        $currentTenant = $contextService->getActiveTenant($request->user());
 
         if ($currentTenant === null) {
             abort(404, __('Organization not found.'));
@@ -66,22 +65,5 @@ final class OrganizationController extends Controller
         $currentTenant->update($request->validated());
 
         return back()->with('success', __('Organization updated successfully.'));
-    }
-
-    /**
-     * Resolve the current tenant from the container or context service.
-     */
-    private function resolveCurrentTenant(Request $request, TenantContextService $contextService): ?Tenant
-    {
-        if (app()->bound('current_tenant')) {
-            $tenant = app('current_tenant');
-            if ($tenant instanceof Tenant) {
-                return $tenant;
-            }
-        }
-
-        $user = $request->user();
-
-        return $user !== null ? $contextService->getCurrentTenant($user) : null;
     }
 }

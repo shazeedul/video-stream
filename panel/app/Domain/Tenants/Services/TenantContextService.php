@@ -11,7 +11,7 @@ use App\Enums\TenantUserStatus;
 use App\Models\User;
 use Illuminate\Support\Str;
 
-final class TenantContextService
+class TenantContextService
 {
     /**
      * Resolve the current tenant for the given user.
@@ -77,6 +77,26 @@ final class TenantContextService
         session(['current_tenant_id' => $tenant->id]);
 
         return $tenant;
+    }
+
+    /**
+     * Get the active tenant from container instance or resolve for user.
+     */
+    public function getActiveTenant(?User $user = null): ?Tenant
+    {
+        if (app()->bound('current_tenant')) {
+            /** @var mixed $tenant */
+            $tenant = app('current_tenant');
+            if ($tenant instanceof Tenant) {
+                return $tenant;
+            }
+        }
+
+        if ($user !== null) {
+            return $this->getCurrentTenant($user);
+        }
+
+        return null;
     }
 
     /**
