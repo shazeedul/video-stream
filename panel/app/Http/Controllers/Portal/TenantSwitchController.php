@@ -23,7 +23,11 @@ final class TenantSwitchController extends Controller
             abort(403, __('You are not a member of this organization.'));
         }
 
-        $contextService->setCurrentTenant($user, $tenant);
+        $switched = $contextService->setCurrentTenant($user, $tenant);
+
+        if (! $switched) {
+            return back()->with('error', __('Failed to switch active organization.'));
+        }
 
         return back()->with('success', __('Switched active organization.'));
     }

@@ -1,1 +1,16 @@
-{}
+{
+    "Failed to switch active organization.": "Failed to switch active organization.",
+    "Manage your organization's general information and settings.": "Manage your organization's general information and settings.",
+    "Organization Name": "Organization Name",
+    "Organization Profile": "Organization Profile",
+    "Organization Settings": "Organization Settings",
+    "Organization Slug": "Organization Slug",
+    "Organization not found.": "Organization not found.",
+    "Organization updated successfully.": "Organization updated successfully.",
+    "Save Changes": "Save Changes",
+    "Saving...": "Saving...",
+    "Slug: :slug": "Slug: :slug",
+    "Switched active organization.": "Switched active organization.",
+    "You are not a member of this organization.": "You are not a member of this organization.",
+    "You have view-only access to this organization profile.": "You have view-only access to this organization profile."
+}

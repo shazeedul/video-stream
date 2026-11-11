@@ -17,6 +17,7 @@ test('user can switch between organizations they belong to', function (): void {
     $response = $this->actingAs($user)->post(route('portal.tenants.switch', $tenant2));
 
     $response->assertRedirect();
+    $response->assertSessionHas('success', __('Switched active organization.'));
     expect(session('current_tenant_id'))->toBe($tenant2->id);
 });
 
@@ -46,6 +47,7 @@ test('organization owner can update organization name and slug', function (): vo
     ]);
 
     $response->assertRedirect();
+    $response->assertSessionHas('success', __('Organization updated successfully.'));
     expect($tenant->fresh()->name)->toBe('Updated Studio')
         ->and($tenant->fresh()->slug)->toBe('updated-studio');
 });
@@ -107,4 +109,20 @@ test('slug must be unique ignoring current tenant', function (): void {
         'slug' => 'existing-org',
     ]);
     $response2->assertSessionHasErrors(['slug']);
+});
+
+test('switching tenant flashes error when setCurrentTenant returns false', function (): void {
+    $user = User::factory()->create();
+    $tenant = Tenant::factory()->create();
+    $tenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    $mockContextService = Mockery::mock(App\Domain\Tenants\Services\TenantContextService::class);
+    $mockContextService->shouldReceive('getCurrentTenant')->andReturn($tenant);
+    $mockContextService->shouldReceive('setCurrentTenant')->andReturn(false);
+    app()->instance(App\Domain\Tenants\Services\TenantContextService::class, $mockContextService);
+
+    $response = $this->actingAs($user)->post(route('portal.tenants.switch', $tenant));
+
+    $response->assertRedirect();
+    $response->assertSessionHas('error', __('Failed to switch active organization.'));
 });

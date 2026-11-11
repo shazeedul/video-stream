@@ -17,16 +17,7 @@ final class UpdateOrganizationRequest extends FormRequest
      */
     public function currentTenant(): ?Tenant
     {
-        if (app()->bound('current_tenant')) {
-            $tenant = app('current_tenant');
-            if ($tenant instanceof Tenant) {
-                return $tenant;
-            }
-        }
-
-        $user = $this->user();
-
-        return $user !== null ? app(TenantContextService::class)->getCurrentTenant($user) : null;
+        return app(TenantContextService::class)->getActiveTenant($this->user());
     }
 
     /**
