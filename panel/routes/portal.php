@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Portal\DashboardController;
 use App\Http\Controllers\Portal\NotificationController;
 use App\Http\Controllers\Portal\Settings\OrganizationController;
+use App\Http\Controllers\Portal\Settings\OrganizationMemberController;
 use App\Http\Controllers\Portal\Settings\PasswordController;
 use App\Http\Controllers\Portal\Settings\ProfileController;
 use App\Http\Controllers\Portal\Settings\UserPreferencesController;
@@ -52,6 +53,14 @@ Route::prefix('panel')
             // Organization routes
             Route::get('organization', [OrganizationController::class, 'overview'])->name('organization.overview');
             Route::put('organization', [OrganizationController::class, 'update'])->name('organization.update');
+
+            // Organization member routes
+            Route::prefix('organization/members')->name('organization.members.')->group(function (): void {
+                Route::get('/', [OrganizationMemberController::class, 'index'])->name('index');
+                Route::post('/', [OrganizationMemberController::class, 'store'])->name('store');
+                Route::patch('{membership}', [OrganizationMemberController::class, 'update'])->name('update');
+                Route::delete('{membership}', [OrganizationMemberController::class, 'destroy'])->name('destroy');
+            });
 
             // Account deletion routes
             Route::get('profile/delete', [ProfileController::class, 'delete'])->middleware('permission:profile.delete')->name('profile.delete');

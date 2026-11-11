@@ -1,6 +1,12 @@
 {
+    "An organization must have at least one active owner.": "An organization must have at least one active owner.",
+    "Cannot remove the only owner of the organization.": "Cannot remove the only owner of the organization.",
     "Failed to switch active organization.": "Failed to switch active organization.",
     "Manage your organization's general information and settings.": "Manage your organization's general information and settings.",
+    "Member added successfully.": "Member added successfully.",
+    "Member not found.": "Member not found.",
+    "Member removed successfully.": "Member removed successfully.",
+    "Member role updated successfully.": "Member role updated successfully.",
     "Organization Name": "Organization Name",
     "Organization Profile": "Organization Profile",
     "Organization Settings": "Organization Settings",
@@ -11,6 +17,7 @@
     "Saving...": "Saving...",
     "Slug: :slug": "Slug: :slug",
     "Switched active organization.": "Switched active organization.",
+    "This user is already a member of this organization.": "This user is already a member of this organization.",
     "You are not a member of this organization.": "You are not a member of this organization.",
     "You have view-only access to this organization profile.": "You have view-only access to this organization profile."
 }
