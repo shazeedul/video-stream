@@ -23,7 +23,12 @@ final class DatabaseSeeder extends Seeder
             UserSeeder::class,
         ]);
 
-        // 3. System Settings
+        // 3. Multi-Tenancy - Demo Organizations and Memberships
+        $this->call([
+            TenantSeeder::class,
+        ]);
+
+        // 4. System Settings
         $this->call([
             SystemSettingSeeder::class,
         ]);
