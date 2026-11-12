@@ -7,6 +7,8 @@ namespace App\Providers;
 use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Tenants\Services\TenantContextService;
+use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
+use App\Domain\Uploads\Services\MinioMultipartUploadService;
 use App\Domain\Videos\Models\Video;
 use App\Policies\TenantPolicy;
 use App\Policies\VideoPolicy;
@@ -29,6 +31,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(TenantContextServiceInterface::class, TenantContextService::class);
+        $this->app->bind(MultipartUploadServiceInterface::class, MinioMultipartUploadService::class);
     }
 
     /**
