@@ -4,9 +4,10 @@ import { index as organizationMembersIndex } from '@/routes/portal/settings/orga
 import { edit as editPassword } from '@/routes/portal/settings/password';
 import { index as preferencesIndex } from '@/routes/portal/settings/preferences';
 import { deleteMethod as deleteProfile, edit as editProfile, overview as profileOverview } from '@/routes/portal/settings/profile';
+import { index as videosIndex } from '@/routes/portal/videos';
 import { type NavGroup, type NavItem } from '@/types';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
-import { Building2, Edit, LayoutGrid, Lock, Settings as SettingsIcon, Trash2, User as UserIcon, Users } from 'lucide-react';
+import { Building2, Edit, LayoutGrid, Lock, Settings as SettingsIcon, Trash2, User as UserIcon, Users, Video } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function usePortalMainNavigation() {
@@ -23,6 +24,13 @@ export function usePortalMainNavigation() {
                         icon: LayoutGrid,
                         permission: '*',
                         active_when: dashboard().url,
+                    },
+                    {
+                        title: __('Videos'),
+                        href: videosIndex(),
+                        icon: Video,
+                        permission: '*',
+                        active_when: videosIndex().url + '*',
                     },
                 ],
             },
@@ -112,4 +120,3 @@ export function useSettingsNavigation(): NavItem[] {
 }
 
 export const useUserMainNavigation = usePortalMainNavigation;
-
