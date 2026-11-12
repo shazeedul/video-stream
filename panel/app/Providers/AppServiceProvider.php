@@ -7,7 +7,9 @@ namespace App\Providers;
 use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Tenants\Services\TenantContextService;
+use App\Domain\Videos\Models\Video;
 use App\Policies\TenantPolicy;
+use App\Policies\VideoPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,6 +20,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     private array $policies = [
         Tenant::class => TenantPolicy::class,
+        Video::class => VideoPolicy::class,
     ];
 
     /**
