@@ -165,4 +165,4 @@ export interface User extends BaseModel {
 }
 
 export * from './tenant';
-
+export * from './video';
