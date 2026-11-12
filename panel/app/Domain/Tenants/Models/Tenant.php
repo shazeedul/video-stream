@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Tenants\Models;
 
+use App\Domain\Uploads\Models\UploadSession;
+use App\Domain\Videos\Models\Video;
 use App\Enums\TenantStatus;
 use App\Models\User;
 use Database\Factories\TenantFactory;
@@ -52,6 +54,22 @@ final class Tenant extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(TenantUser::class, 'tenant_id');
+    }
+
+    /**
+     * Videos belonging to this tenant.
+     */
+    public function videos(): HasMany
+    {
+        return $this->hasMany(Video::class, 'tenant_id');
+    }
+
+    /**
+     * Upload sessions belonging to this tenant.
+     */
+    public function uploadSessions(): HasMany
+    {
+        return $this->hasMany(UploadSession::class, 'tenant_id');
     }
 
     /**
