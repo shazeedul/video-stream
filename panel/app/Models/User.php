@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Tenants\Models\TenantUser;
+use App\Domain\Videos\Models\Video;
 use App\Enums\TenantRole;
 use App\Enums\TenantUserStatus;
 use App\Enums\UserStatus;
@@ -81,6 +82,14 @@ final class User extends Authenticatable
     public function tenantMemberships(): HasMany
     {
         return $this->hasMany(TenantUser::class, 'user_id');
+    }
+
+    /**
+     * Get the videos created by the user.
+     */
+    public function videos(): HasMany
+    {
+        return $this->hasMany(Video::class, 'user_id');
     }
 
     /**
