@@ -45,6 +45,39 @@ services:
     volumes:
       - minio_data:/data
 
+  panel:
+    build:
+      context: ./panel
+      dockerfile: Dockerfile
+    container_name: wiz_panel
+    restart: unless-stopped
+    ports:
+      - "${PANEL_PORT:-8080}:8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: "http://localhost:${PANEL_PORT:-8080}"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: wiz_video
+      DB_USERNAME: wiz_user
+      DB_PASSWORD: secret
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_URL: http://localhost:9000/videos-original
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    volumes:
+      - ./panel:/var/www/html
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
   nginx:
     image: nginx:alpine
     container_name: wiz_nginx
