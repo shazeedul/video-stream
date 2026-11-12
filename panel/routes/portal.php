@@ -10,6 +10,7 @@ use App\Http\Controllers\Portal\Settings\PasswordController;
 use App\Http\Controllers\Portal\Settings\ProfileController;
 use App\Http\Controllers\Portal\Settings\UserPreferencesController;
 use App\Http\Controllers\Portal\TenantSwitchController;
+use App\Http\Controllers\Portal\Videos\VideoController;
 use App\Http\Controllers\Portal\Videos\VideoUploadController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,12 @@ Route::prefix('panel')
          * Tenant switcher routes
          */
         Route::post('tenants/switch/{tenant}', [TenantSwitchController::class, 'switch'])->name('tenants.switch');
+
+        /*
+         * Video library routes
+         */
+        Route::resource('videos', VideoController::class)
+            ->only(['index', 'store', 'show', 'update', 'destroy']);
 
         /*
          * Video upload routes
