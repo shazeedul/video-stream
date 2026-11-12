@@ -50,7 +50,7 @@ final class UpdateVideoRequest extends FormRequest
     {
         return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
+            'description' => ['sometimes', 'nullable', 'string'],
             'visibility' => ['sometimes', 'required', Rule::enum(VideoVisibility::class)],
             'metadata' => ['sometimes', 'nullable', 'array'],
         ];
