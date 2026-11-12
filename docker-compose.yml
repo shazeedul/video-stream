@@ -56,6 +56,7 @@ services:
       - "${PANEL_PORT:-8080}:8000"
     environment:
       APP_ENV: local
+      APP_KEY: "base64://BGXoPICIxkq9zyDW2K6i3qZ6vtusvZP0pxFGLJIJw="
       APP_DEBUG: "true"
       APP_URL: "http://localhost:${PANEL_PORT:-8080}"
       DB_CONNECTION: pgsql
@@ -84,7 +85,7 @@ services:
     container_name: wiz_nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${NGINX_PORT:-8088}:80"
     volumes:
       - ./infrastructure/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     extra_hosts:
