@@ -28,7 +28,12 @@ final class DatabaseSeeder extends Seeder
             TenantSeeder::class,
         ]);
 
-        // 4. System Settings
+        // 4. Video Library - Demo Videos and Storage Assets
+        $this->call([
+            VideoSeeder::class,
+        ]);
+
+        // 5. System Settings
         $this->call([
             SystemSettingSeeder::class,
         ]);
