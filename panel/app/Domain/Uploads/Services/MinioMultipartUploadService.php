@@ -176,6 +176,14 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
             ];
         }
 
+        if (count($formattedParts) !== $session->total_parts) {
+            throw new InvalidArgumentException("Incomplete parts: expected {$session->total_parts} parts, received ".count($formattedParts).'.');
+        }
+
+        if ($session->video === null) {
+            throw new DomainException('Associated video not found.');
+        }
+
         usort($formattedParts, fn (array $a, array $b): int => $a['PartNumber'] <=> $b['PartNumber']);
 
         $s3 = $this->resolveClient($client);
@@ -239,6 +247,10 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
         UploadSession $session,
         ?S3Client $client = null,
     ): void {
+        if ($session->status === UploadSessionStatus::ABORTED) {
+            return;
+        }
+
         if ($session->status === UploadSessionStatus::COMPLETED) {
             throw new DomainException('Cannot abort a completed upload session.');
         }
