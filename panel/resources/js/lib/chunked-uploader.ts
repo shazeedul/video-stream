@@ -133,34 +133,7 @@ export class ChunkedUploader {
 
             // Step 1: Create draft video if not already provided
             if (!this.videoId) {
-                this.setState('creating_draft');
-                const defaultTitle = this.file.name.replace(/\.[^/.]+$/, '').trim() || 'Untitled Video';
-                const createRes = await axios.post(
-                    storeVideoRoute().url,
-                    {
-                        title: this.options.title || defaultTitle,
-                        description: this.options.description || null,
-                        visibility: this.options.visibility || 'private',
-                    },
-                    {
-                        headers: {
-                            Accept: 'application/json, text/html',
-                            'X-Inertia': 'true',
-                        },
-                    },
-                );
-
-                const resolvedId =
-                    createRes.data?.props?.video?.id ||
-                    createRes.data?.video?.id ||
-                    createRes.data?.id ||
-                    this.extractVideoIdFromUrl(createRes.request?.responseURL || '') ||
-                    this.extractVideoIdFromUrl(createRes.headers?.location || '');
-
-                if (!resolvedId) {
-                    throw new Error('Failed to create draft video record.');
-                }
-                this.videoId = String(resolvedId);
+                this.videoId = await this.createDraftVideo();
             }
 
             if (this.isAborted) {
@@ -448,6 +421,37 @@ export class ChunkedUploader {
         };
 
         this.options.onProgress?.(progress);
+    }
+
+    private async createDraftVideo(): Promise<string> {
+        this.setState('creating_draft');
+        const defaultTitle = this.file.name.replace(/\.[^/.]+$/, '').trim() || 'Untitled Video';
+        const response = await axios.post(
+            storeVideoRoute().url,
+            {
+                title: this.options.title || defaultTitle,
+                description: this.options.description || null,
+                visibility: this.options.visibility || 'private',
+            },
+            {
+                headers: {
+                    Accept: 'application/json',
+                },
+            },
+        );
+
+        const resolvedId =
+            response.data?.id ||
+            response.data?.video?.id ||
+            response.data?.props?.video?.id ||
+            this.extractVideoIdFromUrl(response.request?.responseURL || '') ||
+            this.extractVideoIdFromUrl(response.headers?.location || '');
+
+        if (!resolvedId) {
+            throw new Error('Failed to create draft video record.');
+        }
+
+        return String(resolvedId);
     }
 
     private extractVideoIdFromUrl(url: string): string | null {

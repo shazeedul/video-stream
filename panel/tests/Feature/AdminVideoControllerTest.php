@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Domain\Tenants\Models\Tenant;
+use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Uploads\Models\UploadSession;
 use App\Domain\Videos\Models\Video;
 use App\Domain\Videos\Models\VideoAsset;
 use App\Enums\AssetType;
+use App\Enums\UploadSessionStatus;
 use App\Enums\VideoStatus;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
@@ -240,4 +242,55 @@ test('deleting non existent video returns 404', function (): void {
     $this->actingAs($admin)
         ->delete(route('admin.videos.destroy', '00000000-0000-0000-0000-000000000000'))
         ->assertNotFound();
+});
+
+test('platform admin passing all for tenant_id and status returns all videos without syntax error', function (): void {
+    $admin = User::factory()->create();
+    $admin->assignRole('admin');
+
+    $tenantA = Tenant::factory()->create();
+    $tenantB = Tenant::factory()->create();
+
+    Video::factory()->create(['tenant_id' => $tenantA->id, 'status' => VideoStatus::READY]);
+    Video::factory()->create(['tenant_id' => $tenantB->id, 'status' => VideoStatus::DRAFT]);
+
+    $response = $this->actingAs($admin)->get(route('admin.videos.index', [
+        'tenant_id' => 'all',
+        'status' => 'all',
+    ]));
+
+    $response->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('admin/videos/index')
+            ->has('videos.data', 2)
+            ->where('filters.tenant_id', 'all')
+            ->where('filters.status', 'all')
+        );
+});
+
+test('platform admin deleting video aborts pending upload sessions to clean up partial chunks', function (): void {
+    $admin = User::factory()->create();
+    $admin->assignRole('admin');
+
+    $tenant = Tenant::factory()->create();
+    $video = Video::factory()->create(['tenant_id' => $tenant->id]);
+
+    $session = UploadSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'video_id' => $video->id,
+        'status' => UploadSessionStatus::PENDING,
+    ]);
+
+    $mockUploadService = Mockery::mock(MultipartUploadServiceInterface::class);
+    $mockUploadService->shouldReceive('abortUpload')
+        ->once()
+        ->with(Mockery::on(fn ($s) => $s->id === $session->id));
+    app()->instance(MultipartUploadServiceInterface::class, $mockUploadService);
+
+    $response = $this->actingAs($admin)->delete(route('admin.videos.destroy', $video));
+
+    $response->assertRedirect(route('admin.videos.index'))
+        ->assertSessionHas('success');
+
+    expect(Video::find($video->id))->toBeNull();
 });

@@ -35,15 +35,49 @@ final class MinioInitCommand extends Command
             try {
                 if ($client->doesBucketExist($bucket)) {
                     $this->line("Bucket [{$bucket}] already exists.");
-
-                    continue;
+                } else {
+                    $client->createBucket(['Bucket' => $bucket]);
+                    $this->info("Bucket [{$bucket}] created successfully.");
                 }
 
-                $client->createBucket(['Bucket' => $bucket]);
-                $this->info("Bucket [{$bucket}] created successfully.");
+                $client->putBucketCors([
+                    'Bucket' => $bucket,
+                    'CORSConfiguration' => [
+                        'CORSRules' => [
+                            [
+                                'AllowedHeaders' => ['*'],
+                                'AllowedMethods' => ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
+                                'AllowedOrigins' => ['*'],
+                                'ExposeHeaders' => ['ETag'],
+                                'MaxAgeSeconds' => 3000,
+                            ],
+                        ],
+                    ],
+                ]);
+                $this->line("CORS configured for bucket [{$bucket}].");
             } catch (S3Exception $e) {
                 if (in_array($e->getAwsErrorCode(), ['BucketAlreadyOwnedByYou', 'BucketAlreadyExists'], true)) {
                     $this->line("Bucket [{$bucket}] already exists.");
+
+                    try {
+                        $client->putBucketCors([
+                            'Bucket' => $bucket,
+                            'CORSConfiguration' => [
+                                'CORSRules' => [
+                                    [
+                                        'AllowedHeaders' => ['*'],
+                                        'AllowedMethods' => ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
+                                        'AllowedOrigins' => ['*'],
+                                        'ExposeHeaders' => ['ETag'],
+                                        'MaxAgeSeconds' => 3000,
+                                    ],
+                                ],
+                            ],
+                        ]);
+                        $this->line("CORS configured for bucket [{$bucket}].");
+                    } catch (Throwable $corsError) {
+                        $this->warn("Could not set CORS for bucket [{$bucket}]: {$corsError->getMessage()}");
+                    }
 
                     continue;
                 }
