@@ -92,6 +92,29 @@ final class RolePermissions
                     'roles' => ['admin'],
                 ],
             ],
+            // Videos
+            'Videos' => [
+                [
+                    'name' => 'videos.view',
+                    'display_name' => 'View Videos',
+                    'roles' => ['admin'],
+                ],
+                [
+                    'name' => 'videos.create',
+                    'display_name' => 'Create Videos',
+                    'roles' => ['admin'],
+                ],
+                [
+                    'name' => 'videos.update',
+                    'display_name' => 'Update Videos',
+                    'roles' => ['admin'],
+                ],
+                [
+                    'name' => 'videos.delete',
+                    'display_name' => 'Delete Videos',
+                    'roles' => ['admin'],
+                ],
+            ],
             'Users' => [
                 [
                     'name' => 'users.view',
