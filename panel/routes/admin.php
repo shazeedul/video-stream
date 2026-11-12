@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\Settings\UserPreferencesController;
 use App\Http\Controllers\Admin\SystemSettingController;
 use App\Http\Controllers\Admin\TenantController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\VideoController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('panel/admin')
@@ -65,6 +66,15 @@ Route::prefix('panel/admin')
             Route::put('/{tenant}', [TenantController::class, 'update'])->middleware('permission:tenants.update')->name('update');
             Route::patch('/{tenant}/status', [TenantController::class, 'updateStatus'])->middleware('permission:tenants.suspend')->name('status');
             Route::delete('/{tenant}', [TenantController::class, 'destroy'])->middleware('permission:tenants.delete')->name('destroy');
+        });
+
+        /*
+         * videos routes
+         */
+        Route::prefix('videos')->name('videos.')->middleware('permission:videos.view')->group(function (): void {
+            Route::get('/', [VideoController::class, 'index'])->name('index');
+            Route::get('/{video}', [VideoController::class, 'show'])->name('show');
+            Route::delete('/{video}', [VideoController::class, 'destroy'])->middleware('permission:videos.delete')->name('destroy');
         });
 
         /*
