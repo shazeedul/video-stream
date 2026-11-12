@@ -6,9 +6,10 @@ import { deleteMethod as deleteProfile, edit as editProfile, overview as profile
 import { index as settingsIndex } from '@/routes/admin/system-settings';
 import { index as tenantsIndex } from '@/routes/admin/tenants';
 import { index as usersIndex } from '@/routes/admin/users';
+import { index as videosIndex } from '@/routes/admin/videos';
 import { type NavGroup, type NavItem } from '@/types';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
-import { Building2, Cog, Edit, LayoutGrid, Lock, Settings, Settings as SettingsIcon, Shield, Trash2, User as UserIcon, Users } from 'lucide-react';
+import { Building2, Cog, Edit, Film, LayoutGrid, Lock, Settings, Settings as SettingsIcon, Shield, Trash2, User as UserIcon, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function useAdminMainNavigation() {
@@ -25,6 +26,13 @@ export function useAdminMainNavigation() {
                         icon: LayoutGrid,
                         permission: '*',
                         active_when: dashboard().url,
+                    },
+                    {
+                        title: __('Videos'),
+                        href: videosIndex(),
+                        icon: Film,
+                        permission: 'videos.view',
+                        active_when: videosIndex().url + '*',
                     },
                 ],
             },
