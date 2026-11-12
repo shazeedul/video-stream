@@ -61,6 +61,42 @@ return [
             'throw' => false,
             'report' => false,
         ],
+
+        'minio' => [
+            'driver' => 's3',
+            'key' => env('MINIO_ACCESS_KEY', env('AWS_ACCESS_KEY_ID', 'minioadmin')),
+            'secret' => env('MINIO_SECRET_KEY', env('AWS_SECRET_ACCESS_KEY', 'minioadmin')),
+            'region' => env('MINIO_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
+            'bucket' => env('MINIO_BUCKET_ORIGINALS', 'videos-original'),
+            'url' => env('MINIO_URL', 'http://127.0.0.1:9000/videos-original'),
+            'endpoint' => env('MINIO_ENDPOINT', 'http://127.0.0.1:9000'),
+            'use_path_style_endpoint' => true,
+            'throw' => false,
+        ],
+
+        'minio-processed' => [
+            'driver' => 's3',
+            'key' => env('MINIO_ACCESS_KEY', env('AWS_ACCESS_KEY_ID', 'minioadmin')),
+            'secret' => env('MINIO_SECRET_KEY', env('AWS_SECRET_ACCESS_KEY', 'minioadmin')),
+            'region' => env('MINIO_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
+            'bucket' => env('MINIO_BUCKET_PROCESSED', 'videos-processed'),
+            'url' => env('MINIO_URL', 'http://127.0.0.1:9000/videos-processed'),
+            'endpoint' => env('MINIO_ENDPOINT', 'http://127.0.0.1:9000'),
+            'use_path_style_endpoint' => true,
+            'throw' => false,
+        ],
+
+        'thumbnails' => [
+            'driver' => 's3',
+            'key' => env('MINIO_ACCESS_KEY', env('AWS_ACCESS_KEY_ID', 'minioadmin')),
+            'secret' => env('MINIO_SECRET_KEY', env('AWS_SECRET_ACCESS_KEY', 'minioadmin')),
+            'region' => env('MINIO_REGION', env('AWS_DEFAULT_REGION', 'us-east-1')),
+            'bucket' => env('MINIO_BUCKET_THUMBNAILS', 'thumbnails'),
+            'url' => env('MINIO_URL', 'http://127.0.0.1:9000/thumbnails'),
+            'endpoint' => env('MINIO_ENDPOINT', 'http://127.0.0.1:9000'),
+            'use_path_style_endpoint' => true,
+            'throw' => false,
+        ],
         'dos' => [
             'driver' => 's3',
             'key' => env('DOS_ACCESS_KEY_ID'),

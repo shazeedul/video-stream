@@ -35,5 +35,12 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="MINIO_ACCESS_KEY" value="minioadmin"/>
+        <env name="MINIO_SECRET_KEY" value="minioadmin"/>
+        <env name="MINIO_REGION" value="us-east-1"/>
+        <env name="MINIO_ENDPOINT" value="http://127.0.0.1:9000"/>
+        <env name="MINIO_BUCKET_ORIGINALS" value="videos-original"/>
+        <env name="MINIO_BUCKET_PROCESSED" value="videos-processed"/>
+        <env name="MINIO_BUCKET_THUMBNAILS" value="thumbnails"/>
     </php>
 </phpunit>
