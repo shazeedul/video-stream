@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import PortalLayout from '@/layouts/portal-layout';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes/portal';
-import { destroy as destroyVideoRoute, update as updateVideoRoute, index as videosIndexRoute } from '@/routes/portal/videos';
+import { destroy as destroyVideoRoute, show as showVideoRoute, update as updateVideoRoute, index as videosIndexRoute } from '@/routes/portal/videos';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import type { Video, VideoAsset, VideoVisibility } from '@/types/video';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
@@ -88,7 +88,7 @@ export default function VideoShow({ video }: VideoShowProps) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: __('Dashboard'), href: dashboard().url },
         { title: __('Videos'), href: videosIndexRoute().url },
-        { title: video.title, href: '#' },
+        { title: video.title, href: showVideoRoute(video.id).url },
     ];
 
     const copyToClipboard = (text: string, label: string) => {
@@ -539,7 +539,13 @@ export default function VideoShow({ video }: VideoShowProps) {
 
                                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
                                     <span className="text-muted-foreground">{__('Visibility')}</span>
-                                    <span className="font-medium text-foreground capitalize">{video.visibility}</span>
+                                    <span className="font-medium text-foreground">
+                                        {video.visibility === 'public'
+                                            ? __('Public')
+                                            : video.visibility === 'unlisted'
+                                              ? __('Unlisted')
+                                              : __('Private')}
+                                    </span>
                                 </div>
 
                                 <div className="flex items-center justify-between border-b border-border/50 pb-2">
@@ -593,9 +599,14 @@ export default function VideoShow({ video }: VideoShowProps) {
                                                       ? 'warning'
                                                       : 'secondary'
                                             }
-                                            className="capitalize"
                                         >
-                                            {latestUploadSession.status}
+                                            {latestUploadSession.status === 'completed'
+                                                ? __('Completed')
+                                                : latestUploadSession.status === 'pending'
+                                                  ? __('Pending')
+                                                  : latestUploadSession.status === 'aborted'
+                                                    ? __('Aborted')
+                                                    : __('Expired')}
                                         </Badge>
                                     </div>
                                     <div className="flex items-center justify-between">
