@@ -43,7 +43,21 @@ test('can write, read, and delete file on minio disk', function (): void {
         ->and($disk->exists($filename))->toBeFalse();
 });
 
-test('storage:minio-init command initializes buckets idempotently', function (): void {
+test('storage:minio-init command initializes buckets idempotently and configures cors with etag exposed', function (): void {
     $this->artisan('storage:minio-init')
         ->assertSuccessful();
+
+    $disk = Storage::disk('minio');
+    if (method_exists($disk, 'getClient')) {
+        /** @var Aws\S3\S3Client $client */
+        $client = $disk->getClient();
+        $cors = $client->getBucketCors([
+            'Bucket' => (string) config('filesystems.disks.minio.bucket', 'videos-original'),
+        ]);
+
+        $rules = $cors['CORSRules'] ?? [];
+        expect($rules)->not->toBeEmpty();
+        $exposed = $rules[0]['ExposeHeaders'] ?? [];
+        expect($exposed)->toContain('ETag');
+    }
 });

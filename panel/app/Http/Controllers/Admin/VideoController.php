@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Domain\Tenants\Models\Tenant;
+use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Videos\Models\Video;
+use App\Enums\UploadSessionStatus;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,6 +18,13 @@ use Throwable;
 
 final class VideoController extends Controller
 {
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct(
+        private readonly MultipartUploadServiceInterface $uploadService,
+    ) {}
+
     /**
      * Display a listing of videos across all tenants.
      */
@@ -32,11 +41,11 @@ final class VideoController extends Controller
             $query->search($search);
         }
 
-        if (is_string($tenantId) && mb_trim($tenantId) !== '') {
+        if (is_string($tenantId) && mb_trim($tenantId) !== '' && $tenantId !== 'all') {
             $query->where('tenant_id', $tenantId);
         }
 
-        if (is_string($status) && mb_trim($status) !== '') {
+        if (is_string($status) && mb_trim($status) !== '' && $status !== 'all') {
             $query->ofStatus($status);
         }
 
@@ -87,6 +96,18 @@ final class VideoController extends Controller
         $videoModel = Video::withoutTenantScope()
             ->with('assets')
             ->findOrFail($video);
+
+        $pendingSessions = $videoModel->uploadSessions()
+            ->where('status', UploadSessionStatus::PENDING)
+            ->get();
+
+        foreach ($pendingSessions as $session) {
+            try {
+                $this->uploadService->abortUpload($session);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
 
         foreach ($videoModel->assets as $asset) {
             if (! empty($asset->disk) && ! empty($asset->object_key)) {

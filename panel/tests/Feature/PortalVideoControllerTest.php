@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use App\Domain\Tenants\Models\Tenant;
+use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
+use App\Domain\Uploads\Models\UploadSession;
 use App\Domain\Videos\Models\Video;
 use App\Domain\Videos\Models\VideoAsset;
 use App\Enums\AssetType;
 use App\Enums\TenantRole;
+use App\Enums\UploadSessionStatus;
 use App\Enums\VideoStatus;
 use App\Enums\VideoVisibility;
 use App\Models\User;
@@ -271,4 +274,55 @@ test('store and update video validation rules', function (): void {
             'visibility' => 'invalid-visibility',
         ])
         ->assertSessionHasErrors(['visibility']);
+});
+
+test('member can create draft video and receive json response', function (): void {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create();
+    $tenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    $response = $this->actingAs($user)
+        ->postJson(route('portal.videos.store'), [
+            'title' => 'API Draft Video',
+            'description' => 'Draft created via API request',
+            'visibility' => VideoVisibility::PRIVATE->value,
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonStructure([
+            'video' => ['id', 'title', 'description', 'status', 'visibility', 'tenant_id'],
+            'id',
+        ])
+        ->assertJsonPath('video.title', 'API Draft Video');
+
+    $video = Video::where('title', 'API Draft Video')->first();
+    expect($video)->not->toBeNull()
+        ->and($response->json('id'))->toBe($video->id);
+});
+
+test('deleting video aborts pending upload sessions to clean up partial chunks', function (): void {
+    $tenant = Tenant::factory()->create();
+    $admin = User::factory()->create();
+    $tenant->users()->attach($admin->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::ADMIN->value]);
+
+    app()->instance('current_tenant', $tenant);
+
+    $video = Video::factory()->create(['tenant_id' => $tenant->id, 'user_id' => $admin->id]);
+    $session = UploadSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'video_id' => $video->id,
+        'status' => UploadSessionStatus::PENDING,
+    ]);
+
+    $mockUploadService = Mockery::mock(MultipartUploadServiceInterface::class);
+    $mockUploadService->shouldReceive('abortUpload')
+        ->once()
+        ->with(Mockery::on(fn ($s) => $s->id === $session->id));
+    app()->instance(MultipartUploadServiceInterface::class, $mockUploadService);
+
+    $this->actingAs($admin)
+        ->delete(route('portal.videos.destroy', $video))
+        ->assertRedirect(route('portal.videos.index'));
+
+    expect(Video::find($video->id))->toBeNull();
 });

@@ -6,13 +6,16 @@ namespace App\Http\Controllers\Portal\Videos;
 
 use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
+use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Videos\Models\Video;
+use App\Enums\UploadSessionStatus;
 use App\Enums\VideoStatus;
 use App\Enums\VideoVisibility;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Portal\Videos\StoreVideoRequest;
 use App\Http\Requests\Portal\Videos\UpdateVideoRequest;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +25,13 @@ use Throwable;
 
 final class VideoController extends Controller
 {
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct(
+        private readonly MultipartUploadServiceInterface $uploadService,
+    ) {}
+
     /**
      * Display a listing of videos for the active tenant.
      */
@@ -39,11 +49,11 @@ final class VideoController extends Controller
             $query->search((string) $search);
         }
 
-        if ($status !== null && mb_trim((string) $status) !== '') {
+        if ($status !== null && mb_trim((string) $status) !== '' && (string) $status !== 'all') {
             $query->ofStatus((string) $status);
         }
 
-        if ($visibility !== null && mb_trim((string) $visibility) !== '') {
+        if ($visibility !== null && mb_trim((string) $visibility) !== '' && (string) $visibility !== 'all') {
             $query->ofVisibility((string) $visibility);
         }
 
@@ -78,7 +88,7 @@ final class VideoController extends Controller
     /**
      * Create a new draft video for the active tenant.
      */
-    public function store(StoreVideoRequest $request): RedirectResponse
+    public function store(StoreVideoRequest $request): RedirectResponse|JsonResponse
     {
         $this->authorize('create', Video::class);
 
@@ -98,6 +108,13 @@ final class VideoController extends Controller
             'visibility' => $request->validated('visibility') ?? VideoVisibility::PRIVATE->value,
             'status' => VideoStatus::DRAFT,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'video' => $video,
+                'id' => $video->id,
+            ], 201);
+        }
 
         return redirect()->route('portal.videos.show', $video)->with('success', __('Video created successfully.'));
     }
@@ -143,6 +160,18 @@ final class VideoController extends Controller
     {
         $this->ensureTenantAccess($video, $request->user());
         $this->authorize('delete', $video);
+
+        $pendingSessions = $video->uploadSessions()
+            ->where('status', UploadSessionStatus::PENDING)
+            ->get();
+
+        foreach ($pendingSessions as $session) {
+            try {
+                $this->uploadService->abortUpload($session);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
 
         $video->loadMissing('assets');
 
