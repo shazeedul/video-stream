@@ -12,13 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import PortalLayout from '@/layouts/portal-layout';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes/portal';
-import {
-    destroy as destroyVideoRoute,
-    show as showVideoRoute,
-    store as storeVideoRoute,
-    update as updateVideoRoute,
-    index as videosIndexRoute,
-} from '@/routes/portal/videos';
+import { destroy as destroyVideoRoute, show as showVideoRoute, update as updateVideoRoute, index as videosIndexRoute } from '@/routes/portal/videos';
 import type { BreadcrumbItem, PaginatedData, SharedData } from '@/types';
 import type { Video, VideoFilters, VideoStats, VideoVisibility } from '@/types/video';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
@@ -48,6 +42,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { toast } from 'sonner';
+import UploadDialog from './partials/upload-dialog';
 import VideoCard, { formatDuration } from './partials/video-card';
 import VideoStatusBadge from './partials/video-status-badge';
 
@@ -69,13 +64,8 @@ export default function VideosIndex({ videos, filters, stats }: VideosIndexProps
     // Local filter state
     const [searchTerm, setSearchTerm] = useState(filters.search ?? '');
 
-    // Upload / Create draft modal
+    // Upload dialog modal
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-    const [uploadTitle, setUploadTitle] = useState('');
-    const [uploadDescription, setUploadDescription] = useState('');
-    const [uploadVisibility, setUploadVisibility] = useState<VideoVisibility>('private');
-    const [isCreating, setIsCreating] = useState(false);
-    const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
 
     // Edit modal
     const [editingVideo, setEditingVideo] = useState<Video | null>(null);
@@ -142,42 +132,6 @@ export default function VideosIndex({ videos, filters, stats }: VideosIndexProps
     const hasActiveFilters = Boolean(
         filters.search || (filters.status && filters.status !== 'all') || (filters.visibility && filters.visibility !== 'all'),
     );
-
-    // Create Draft Handler
-    const handleCreateVideo = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!uploadTitle.trim()) {
-            setCreateErrors({ title: __('Title is required.') });
-            return;
-        }
-
-        setIsCreating(true);
-        setCreateErrors({});
-
-        router.post(
-            storeVideoRoute().url,
-            {
-                title: uploadTitle,
-                description: uploadDescription || null,
-                visibility: uploadVisibility,
-            },
-            {
-                onSuccess: () => {
-                    setIsUploadModalOpen(false);
-                    setUploadTitle('');
-                    setUploadDescription('');
-                    setUploadVisibility('private');
-                    toast.success(__('Video created successfully.'));
-                },
-                onError: (errs) => {
-                    setCreateErrors(errs);
-                },
-                onFinish: () => {
-                    setIsCreating(false);
-                },
-            },
-        );
-    };
 
     // Open Edit Dialog
     const handleOpenEdit = (video: Video) => {
@@ -597,81 +551,8 @@ export default function VideosIndex({ videos, filters, stats }: VideosIndexProps
                 )}
             </div>
 
-            {/* Create Draft Video Modal */}
-            <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <form onSubmit={handleCreateVideo}>
-                        <DialogHeader>
-                            <DialogTitle>{__('Upload Video')}</DialogTitle>
-                            <DialogDescription>{__('Create a new video record and prepare for media upload.')}</DialogDescription>
-                        </DialogHeader>
-
-                        <div className="mt-4 flex flex-col gap-4">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="create-video-title">
-                                    {__('Title')} <span className="text-destructive">*</span>
-                                </Label>
-                                <Input
-                                    id="create-video-title"
-                                    value={uploadTitle}
-                                    onChange={(e) => setUploadTitle(e.target.value)}
-                                    placeholder={__('e.g. Product Demo 2026')}
-                                    autoFocus
-                                    className={cn(createErrors.title && 'border-destructive focus-visible:ring-destructive')}
-                                />
-                                {createErrors.title && <p className="text-xs text-destructive">{createErrors.title}</p>}
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="create-video-description">{__('Description')}</Label>
-                                <Textarea
-                                    id="create-video-description"
-                                    value={uploadDescription}
-                                    onChange={(e) => setUploadDescription(e.target.value)}
-                                    placeholder={__('Brief overview of the video content...')}
-                                    rows={3}
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="create-video-visibility">{__('Visibility')}</Label>
-                                <Select value={uploadVisibility} onValueChange={(val) => setUploadVisibility(val as VideoVisibility)}>
-                                    <SelectTrigger id="create-video-visibility">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="private">
-                                            {__('Private')} — <span className="text-xs text-muted-foreground">{__('Only organization members')}</span>
-                                        </SelectItem>
-                                        <SelectItem value="unlisted">
-                                            {__('Unlisted')} — <span className="text-xs text-muted-foreground">{__('Anyone with direct link')}</span>
-                                        </SelectItem>
-                                        <SelectItem value="public">
-                                            {__('Public')} — <span className="text-xs text-muted-foreground">{__('Publicly discoverable')}</span>
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        <DialogFooter className="mt-6">
-                            <Button type="button" variant="outline" onClick={() => setIsUploadModalOpen(false)} disabled={isCreating}>
-                                {__('Cancel')}
-                            </Button>
-                            <Button type="submit" disabled={isCreating} className="cursor-pointer">
-                                {isCreating ? (
-                                    <span className="flex items-center gap-2">
-                                        <Loader2 className="size-4 animate-spin" />
-                                        {__('Creating...')}
-                                    </span>
-                                ) : (
-                                    __('Continue to Upload')
-                                )}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            {/* Direct-to-MinIO Chunked Upload Dialog */}
+            <UploadDialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen} />
 
             {/* Edit Video Metadata Modal */}
             <Dialog open={Boolean(editingVideo)} onOpenChange={(open) => !open && setEditingVideo(null)}>
