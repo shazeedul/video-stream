@@ -80,7 +80,9 @@ test('tenant user status enum provides labels, colors, and helpers', function ()
 });
 
 test('migrations can rollback cleanly', function (): void {
-    Artisan::call('migrate:rollback', ['--step' => 2]);
+    while (Schema::hasTable('tenants')) {
+        Artisan::call('migrate:rollback', ['--step' => 1]);
+    }
 
     expect(Schema::hasTable('tenant_user'))->toBeFalse()
         ->and(Schema::hasTable('tenants'))->toBeFalse();
