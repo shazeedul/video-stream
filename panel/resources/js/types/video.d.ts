@@ -54,6 +54,11 @@ export interface Video {
     created_at: string;
     updated_at: string;
     user?: VideoUser;
+    tenant?: {
+        id: string;
+        name: string;
+        slug?: string;
+    };
     assets?: VideoAsset[];
     upload_sessions?: UploadSession[];
     uploadSessions?: UploadSession[];
