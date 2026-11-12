@@ -216,7 +216,17 @@ export class ChunkedUploader {
             this.options.onSuccess?.(result);
             return result;
         } catch (error: unknown) {
-            if (!this.isAborted) {
+            this.isAborted = true;
+            for (const xhr of this.activeXhrs.values()) {
+                try {
+                    xhr.abort();
+                } catch {
+                    // Suppress abort errors
+                }
+            }
+            this.activeXhrs.clear();
+
+            if (this.state !== 'aborted') {
                 this.setState('failed');
                 // Server-side abort attempt on unrecoverable failure
                 if (this.videoId && this.uploadId) {
@@ -384,6 +394,14 @@ export class ChunkedUploader {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     const rawEtag = xhr.getResponseHeader('ETag') || xhr.getResponseHeader('etag') || '';
                     const etag = rawEtag.replace(/^"|"$/g, '').trim();
+                    if (!etag) {
+                        reject(
+                            new Error(
+                                `Missing ETag header on part ${partNumber} response. Ensure MinIO exposes the ETag header via Access-Control-Expose-Headers.`,
+                            ),
+                        );
+                        return;
+                    }
                     resolve({ PartNumber: partNumber, ETag: etag });
                 } else {
                     reject(new Error(`Failed to upload part ${partNumber}: HTTP ${xhr.status} ${xhr.statusText}`));
