@@ -9,15 +9,12 @@ RUN apk add --no-cache \
     git \
     curl \
     nodejs \
-    npm \
-    linux-headers \
-    $PHPIZE_DEPS
+    npm
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo pdo_pgsql pgsql pcntl bcmath zip \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS
+# Install PHP extensions using docker-php-extension-installer
+ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+
+RUN install-php-extensions pdo_pgsql pgsql pcntl bcmath zip redis
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -26,4 +23,4 @@ WORKDIR /var/www/html
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=8000"]
+CMD ["php", "-S", "0.0.0.0:8000", "server.php"]
