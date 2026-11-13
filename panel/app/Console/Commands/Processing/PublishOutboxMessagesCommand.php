@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Processing;
 
+use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
 use App\Domain\Processing\Models\MediaOutboxMessage;
-use App\Domain\Processing\Services\RabbitMQPublisherService;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -28,7 +28,7 @@ final class PublishOutboxMessagesCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(RabbitMQPublisherService $publisher): int
+    public function handle(RabbitMQPublisherInterface $publisher): int
     {
         $limit = (int) $this->option('limit');
         $messages = MediaOutboxMessage::pending()

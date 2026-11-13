@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Processing;
 
+use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
 use App\Domain\Processing\Enums\OutboxStatus;
 use App\Domain\Processing\Models\MediaOutboxMessage;
-use App\Domain\Processing\Services\RabbitMQPublisherService;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -25,14 +25,14 @@ final class PublishOutboxMessagesCommandTest extends TestCase
             'payload' => ['video_id' => '019324c3-e836-7db0-bd1b-c40c83a5316e'],
         ]);
 
-        $mockPublisher = Mockery::mock(RabbitMQPublisherService::class);
+        $mockPublisher = Mockery::mock(RabbitMQPublisherInterface::class);
         $mockPublisher->shouldReceive('publish')
             ->once()
             ->with('media.direct', 'media.process', Mockery::on(function ($payload) {
                 return $payload['video_id'] === '019324c3-e836-7db0-bd1b-c40c83a5316e';
             }));
 
-        $this->app->instance(RabbitMQPublisherService::class, $mockPublisher);
+        $this->app->instance(RabbitMQPublisherInterface::class, $mockPublisher);
 
         $this->artisan('media:publish-outbox')
             ->assertSuccessful();
@@ -50,12 +50,12 @@ final class PublishOutboxMessagesCommandTest extends TestCase
             'payload' => ['video_id' => 'test'],
         ]);
 
-        $mockPublisher = Mockery::mock(RabbitMQPublisherService::class);
+        $mockPublisher = Mockery::mock(RabbitMQPublisherInterface::class);
         $mockPublisher->shouldReceive('publish')
             ->once()
             ->andThrow(new Exception('RabbitMQ connection lost'));
 
-        $this->app->instance(RabbitMQPublisherService::class, $mockPublisher);
+        $this->app->instance(RabbitMQPublisherInterface::class, $mockPublisher);
 
         $this->artisan('media:publish-outbox')
             ->assertSuccessful();
