@@ -9,12 +9,13 @@ RUN apk add --no-cache \
     git \
     curl \
     nodejs \
-    npm
+    npm \
+    linux-headers
 
 # Install PHP extensions using docker-php-extension-installer
 ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 
-RUN install-php-extensions pdo_pgsql pgsql pcntl bcmath zip redis
+RUN install-php-extensions pdo_pgsql pgsql pcntl bcmath zip redis sockets
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

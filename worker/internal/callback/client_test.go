@@ -3,6 +3,7 @@ package callback_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -220,5 +221,35 @@ func TestCallbackClient_HonorsContextCancellation(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected context cancellation error, got nil")
+	}
+}
+
+func TestCallbackClient_ReturnsClientErrorFor4xx(t *testing.T) {
+	for _, code := range []int{http.StatusNotFound, http.StatusUnprocessableEntity, http.StatusBadRequest} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(code)
+			_, _ = w.Write([]byte(`{"message":"error"}`))
+		}))
+
+		client := callback.NewClient(server.URL, "secret", callback.WithMaxRetries(0))
+		err := client.SendStatus(context.Background(), callback.Payload{
+			JobID:   "job-1",
+			VideoID: "vid-1",
+			Status:  callback.StatusProbing,
+		})
+
+		var clientErr *callback.ClientError
+		if !errors.As(err, &clientErr) {
+			t.Fatalf("expected *callback.ClientError for status %d, got %v", code, err)
+		}
+		if clientErr.StatusCode != code {
+			t.Errorf("expected status %d, got %d", code, clientErr.StatusCode)
+		}
+		expectedNotFoundOrUnproc := code == http.StatusNotFound || code == http.StatusUnprocessableEntity
+		if clientErr.IsNotFoundOrUnprocessable() != expectedNotFoundOrUnproc {
+			t.Errorf("expected IsNotFoundOrUnprocessable() == %v for code %d", expectedNotFoundOrUnproc, code)
+		}
+
+		server.Close()
 	}
 }

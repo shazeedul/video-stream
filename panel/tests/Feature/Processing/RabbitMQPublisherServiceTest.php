@@ -17,13 +17,6 @@ final class RabbitMQPublisherServiceTest extends TestCase
 
         $publisher->setupTopology();
 
-        $payload = [
-            'test_id' => '019324c3-e836-7db0-bd1b-c40c83a5316e',
-            'action' => 'test_publish',
-        ];
-
-        $publisher->publish('media.direct', 'media.process', $payload);
-
         $connection = new AMQPStreamConnection(
             (string) config('rabbitmq.host', 'rabbitmq'),
             (int) config('rabbitmq.port', 5672),
@@ -35,6 +28,15 @@ final class RabbitMQPublisherServiceTest extends TestCase
         $channel = $connection->channel();
 
         try {
+            $channel->queue_purge('media.jobs');
+
+            $payload = [
+                'test_id' => '019324c3-e836-7db0-bd1b-c40c83a5316e',
+                'action' => 'test_publish',
+            ];
+
+            $publisher->publish('media.direct', 'media.process', $payload);
+
             $message = $channel->basic_get('media.jobs');
             $this->assertNotNull($message, 'Expected a message in media.jobs queue');
 

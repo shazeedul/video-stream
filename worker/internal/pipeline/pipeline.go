@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,6 +12,9 @@ import (
 	"wiz-media-worker/internal/config"
 	"wiz-media-worker/internal/probe"
 )
+
+// ErrJobDiscarded indicates that the media job was discarded because the video was deleted or missing in the platform.
+var ErrJobDiscarded = errors.New("job discarded: video missing or deleted in platform")
 
 // Downloader abstracts downloading source media files from object storage.
 type Downloader interface {
@@ -56,16 +60,19 @@ func NewPipeline(
 	}
 }
 
-// Process executes the complete media probing pipeline:
+// Process executes the complete media probing lifecycle for a media job:
 // 1. Sends callback: status: probing
+//    - If callback returns 404/422 (video deleted/aborted in panel), pipeline discards job and returns nil.
 // 2. Generates local temporary file path in cfg.TempDir
 // 3. Downloads video from MinIO storage (storage.DownloadSourceFile)
 // 4. Runs FFprobe inspector (probe.Inspect)
 // 5. If probe succeeds: sends callback status: probed, duration_seconds, metadata
 // 6. If probe fails: sends callback status: failed, error: truncated err
 //    - If failure callback succeeds: media corruption is decisively reported (returns nil -> message ACKed).
-//    - If failure callback fails: returns error (message NACKed with requeue).
+//    - If failure callback returns 404 or 422: video deleted/aborted in panel, safely discarded (returns nil -> message ACKed).
+//    - If failure callback fails with other error: returns error (message NACKed with requeue).
 // 7. If storage download fails: sends callback status: failed, returns error (message NACKed with requeue).
+//    - If failure callback returns 404 or 422: safely discarded (returns nil -> message ACKed).
 // 8. Always cleans up temporary file via defer os.Remove(...)
 func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	p.logger.InfoContext(ctx, "processing media job", "job_id", job.JobID, "video_id", job.VideoID)
@@ -76,13 +83,24 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 		VideoID: job.VideoID,
 		Status:  callback.StatusProbing,
 	}); err != nil {
+		var clientErr *callback.ClientError
+		if errors.As(err, &clientErr) && clientErr.IsNotFoundOrUnprocessable() {
+			p.logger.WarnContext(ctx, "video deleted or aborted in panel, discarding job",
+				"job_id", job.JobID,
+				"video_id", job.VideoID,
+				"status_code", clientErr.StatusCode,
+			)
+			return nil
+		}
 		p.logger.WarnContext(ctx, "failed to send probing status callback", "job_id", job.JobID, "error", err)
 	}
 
 	// 2. Prepare temp directory and file path
 	if err := os.MkdirAll(p.cfg.TempDir, 0755); err != nil {
 		failErr := fmt.Errorf("failed to create temp directory %s: %w", p.cfg.TempDir, err)
-		_ = p.notifyFailure(ctx, job, failErr)
+		if cbErr := p.notifyFailure(ctx, job, failErr); errors.Is(cbErr, ErrJobDiscarded) {
+			return nil
+		}
 		return failErr
 	}
 
@@ -99,7 +117,9 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	// 3. Download video from MinIO storage
 	if err := p.storage.DownloadSourceFile(ctx, job.SourceBucket, job.SourceKey, tempFilePath); err != nil {
 		failErr := fmt.Errorf("download source file failed: %w", err)
-		_ = p.notifyFailure(ctx, job, failErr)
+		if cbErr := p.notifyFailure(ctx, job, failErr); errors.Is(cbErr, ErrJobDiscarded) {
+			return nil
+		}
 		return failErr
 	}
 
@@ -108,6 +128,9 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	if err != nil {
 		failErr := fmt.Errorf("probe inspection failed: %w", err)
 		cbErr := p.notifyFailure(ctx, job, failErr)
+		if errors.Is(cbErr, ErrJobDiscarded) {
+			return nil
+		}
 		if cbErr != nil {
 			return fmt.Errorf("probe failed and failure callback failed: %w (probe err: %v)", cbErr, failErr)
 		}
@@ -127,6 +150,15 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 		DurationSeconds: &dur,
 		Metadata:        result.ToMetadataMap(),
 	}); err != nil {
+		var clientErr *callback.ClientError
+		if errors.As(err, &clientErr) && clientErr.IsNotFoundOrUnprocessable() {
+			p.logger.WarnContext(ctx, "video deleted or aborted in panel, discarding job",
+				"job_id", job.JobID,
+				"video_id", job.VideoID,
+				"status_code", clientErr.StatusCode,
+			)
+			return nil
+		}
 		p.logger.ErrorContext(ctx, "failed to send probed callback", "job_id", job.JobID, "error", err)
 		return fmt.Errorf("failed to send probed callback: %w", err)
 	}
@@ -139,8 +171,9 @@ func (p *Pipeline) notifyFailure(ctx context.Context, job MediaJob, err error) e
 	p.logger.ErrorContext(ctx, "media job failed", "job_id", job.JobID, "error", err)
 
 	errStr := err.Error()
-	if len(errStr) > 1950 {
-		errStr = errStr[:1950] + " ... [truncated]"
+	runes := []rune(errStr)
+	if len(runes) > 1950 {
+		errStr = string(runes[:1950]) + " ... [truncated]"
 	}
 
 	cbErr := p.callback.SendStatus(ctx, callback.Payload{
@@ -150,6 +183,15 @@ func (p *Pipeline) notifyFailure(ctx context.Context, job MediaJob, err error) e
 		Error:   errStr,
 	})
 	if cbErr != nil {
+		var clientErr *callback.ClientError
+		if errors.As(cbErr, &clientErr) && clientErr.IsNotFoundOrUnprocessable() {
+			p.logger.WarnContext(ctx, "video deleted or aborted in panel, discarding job",
+				"job_id", job.JobID,
+				"video_id", job.VideoID,
+				"status_code", clientErr.StatusCode,
+			)
+			return ErrJobDiscarded
+		}
 		p.logger.WarnContext(ctx, "failed to send failure callback", "job_id", job.JobID, "error", cbErr)
 		return fmt.Errorf("failure callback failed: %w", cbErr)
 	}

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"wiz-media-worker/internal/callback"
 	"wiz-media-worker/internal/config"
 	"wiz-media-worker/internal/consumer"
 	"wiz-media-worker/internal/pipeline"
@@ -215,5 +216,57 @@ func TestConsumer_HandleMessage_ShutdownContext_NacksWithRequeue(t *testing.T) {
 	}
 	if msg.lastRequeue != true {
 		t.Errorf("expected nack requeue = true for redelivery on shutdown, got false")
+	}
+}
+
+func TestConsumer_HandleMessage_VideoDeletedOrUnprocessable_AcksAndDiscards(t *testing.T) {
+	testCases := []struct {
+		name      string
+		runnerErr error
+	}{
+		{
+			name:      "404 not found",
+			runnerErr: &callback.ClientError{StatusCode: 404, Message: "video not found in panel"},
+		},
+		{
+			name:      "422 unprocessable entity",
+			runnerErr: &callback.ClientError{StatusCode: 422, Message: "video processing aborted"},
+		},
+		{
+			name:      "ErrJobDiscarded sentinel",
+			runnerErr: pipeline.ErrJobDiscarded,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Config{Concurrency: 2}
+			runner := &mockPipelineRunner{
+				err: tc.runnerErr,
+			}
+			logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+			c := consumer.NewConsumer(cfg, runner, logger)
+
+			payload := []byte(`{
+				"version": "1.0",
+				"job_id": "job-del-test",
+				"video_id": "video-del-test",
+				"source_bucket": "media-storage",
+				"source_key": "raw/input.mp4"
+			}`)
+			msg := &mockMessage{body: payload}
+
+			err := c.HandleMessage(context.Background(), msg)
+			if err != nil {
+				t.Fatalf("expected HandleMessage to return nil for discarded video, got: %v", err)
+			}
+
+			if msg.ackCount != 1 {
+				t.Errorf("expected message to be ACKed (ackCount=1), got %d", msg.ackCount)
+			}
+			if msg.nackCount != 0 {
+				t.Errorf("expected message NOT to be NACKed (nackCount=0), got %d", msg.nackCount)
+			}
+		})
 	}
 }

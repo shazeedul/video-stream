@@ -3,6 +3,7 @@ package pipeline_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -325,6 +326,176 @@ func TestPipeline_Process_ErrorTruncation(t *testing.T) {
 	}
 	if !strings.HasSuffix(failedPayload.Error, " ... [truncated]") {
 		t.Errorf("expected truncated error to end with ' ... [truncated]', got '%s'", failedPayload.Error[len(failedPayload.Error)-20:])
+	}
+}
+
+func TestPipeline_Process_ProbingCallback_NotFoundOrUnprocessable_DiscardsJobReturnsNil(t *testing.T) {
+	for _, statusCode := range []int{404, 422} {
+		tempDir := t.TempDir()
+		cfg := &config.Config{TempDir: tempDir}
+
+		storageCalled := false
+		storage := &mockStorage{
+			downloadFn: func(ctx context.Context, bucket, objectKey, destPath string) error {
+				storageCalled = true
+				return nil
+			},
+		}
+
+		cb := &mockCallbackClient{
+			statusErrMap: map[string]error{
+				callback.StatusProbing: &callback.ClientError{
+					StatusCode: statusCode,
+					Message:    fmt.Sprintf("HTTP %d Client Error", statusCode),
+				},
+			},
+		}
+		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+		p := pipeline.NewPipeline(cfg, storage, &mockInspector{}, cb, logger)
+
+		job := pipeline.MediaJob{
+			JobID:        "job-del",
+			VideoID:      "vid-del",
+			SourceBucket: "uploads",
+			SourceKey:    "raw/video.mp4",
+		}
+
+		// When video is deleted/aborted in panel (404/422), Process must return nil so message is ACKed and discarded
+		err := p.Process(context.Background(), job)
+		if err != nil {
+			t.Fatalf("expected nil on status code %d, got %v", statusCode, err)
+		}
+
+		if storageCalled {
+			t.Errorf("expected storage download NOT to be attempted when probing returns %d", statusCode)
+		}
+
+		// Must not attempt to send failure callback
+		for _, pl := range cb.Payloads() {
+			if pl.Status == callback.StatusFailed {
+				t.Errorf("expected status 'failed' NOT to be sent when video is missing (%d)", statusCode)
+			}
+		}
+	}
+}
+
+func TestPipeline_Process_ProbedCallback_NotFoundOrUnprocessable_DiscardsJobReturnsNil(t *testing.T) {
+	for _, statusCode := range []int{404, 422} {
+		tempDir := t.TempDir()
+		cfg := &config.Config{TempDir: tempDir}
+
+		storage := &mockStorage{
+			downloadFn: func(ctx context.Context, bucket, objectKey, destPath string) error {
+				return os.WriteFile(destPath, []byte("valid-data"), 0644)
+			},
+		}
+
+		cb := &mockCallbackClient{
+			statusErrMap: map[string]error{
+				callback.StatusProbed: &callback.ClientError{
+					StatusCode: statusCode,
+					Message:    fmt.Sprintf("HTTP %d Client Error", statusCode),
+				},
+			},
+		}
+		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+		p := pipeline.NewPipeline(cfg, storage, &mockInspector{}, cb, logger)
+
+		job := pipeline.MediaJob{
+			JobID:        "job-del-probed",
+			VideoID:      "vid-del-probed",
+			SourceBucket: "uploads",
+			SourceKey:    "raw/video.mp4",
+		}
+
+		err := p.Process(context.Background(), job)
+		if err != nil {
+			t.Fatalf("expected nil when probed returns %d, got %v", statusCode, err)
+		}
+
+		// Must not attempt failure callback
+		for _, pl := range cb.Payloads() {
+			if pl.Status == callback.StatusFailed {
+				t.Errorf("expected status 'failed' NOT to be sent when probed returns %d", statusCode)
+			}
+		}
+	}
+}
+
+func TestPipeline_Process_FailureCallback_NotFoundOrUnprocessable_DiscardsJobReturnsNil(t *testing.T) {
+	for _, statusCode := range []int{404, 422} {
+		tempDir := t.TempDir()
+		cfg := &config.Config{TempDir: tempDir}
+
+		storage := &mockStorage{
+			downloadFn: func(ctx context.Context, bucket, objectKey, destPath string) error {
+				return errors.New("storage download error")
+			},
+		}
+
+		cb := &mockCallbackClient{
+			statusErrMap: map[string]error{
+				callback.StatusFailed: &callback.ClientError{
+					StatusCode: statusCode,
+					Message:    fmt.Sprintf("HTTP %d Client Error", statusCode),
+				},
+			},
+		}
+		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+		p := pipeline.NewPipeline(cfg, storage, &mockInspector{}, cb, logger)
+
+		job := pipeline.MediaJob{
+			JobID:        "job-del-fail",
+			VideoID:      "vid-del-fail",
+			SourceBucket: "uploads",
+			SourceKey:    "raw/video.mp4",
+		}
+
+		err := p.Process(context.Background(), job)
+		if err != nil {
+			t.Fatalf("expected nil when failure callback returns %d, got %v", statusCode, err)
+		}
+	}
+}
+
+func TestPipeline_Process_ErrorTruncation_UTF8Runes(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{TempDir: tempDir}
+
+	// 2500 multi-byte UTF-8 runes (each rune is 3 bytes)
+	multiByteErr := strings.Repeat("世界", 1250)
+	storage := &mockStorage{
+		downloadFn: func(ctx context.Context, bucket, objectKey, destPath string) error {
+			return errors.New(multiByteErr)
+		},
+	}
+
+	cb := &mockCallbackClient{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	p := pipeline.NewPipeline(cfg, storage, &mockInspector{}, cb, logger)
+
+	job := pipeline.MediaJob{
+		JobID:        "job-utf8",
+		VideoID:      "vid-utf8",
+		SourceBucket: "uploads",
+		SourceKey:    "raw/video.mp4",
+	}
+
+	_ = p.Process(context.Background(), job)
+
+	payloads := cb.Payloads()
+	if len(payloads) < 2 {
+		t.Fatalf("expected at least 2 callbacks, got %d", len(payloads))
+	}
+
+	failedPayload := payloads[len(payloads)-1]
+	runes := []rune(failedPayload.Error)
+	expectedRuneCount := 1950 + len([]rune(" ... [truncated]"))
+	if len(runes) != expectedRuneCount {
+		t.Errorf("expected %d runes, got %d", expectedRuneCount, len(runes))
+	}
+	if !strings.HasSuffix(failedPayload.Error, " ... [truncated]") {
+		t.Errorf("expected suffix ' ... [truncated]'")
 	}
 }
 
