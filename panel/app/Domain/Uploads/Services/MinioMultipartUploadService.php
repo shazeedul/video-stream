@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Uploads\Services;
 
+use App\Domain\Processing\Models\MediaOutboxMessage;
 use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Uploads\Models\UploadSession;
 use App\Domain\Videos\Models\Video;
@@ -217,7 +218,7 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
             // S3 mock or network may not provide headObject
         }
 
-        return DB::transaction(function () use ($session, $sizeBytes, $mimeType): Video {
+        return DB::transaction(function () use ($session, $sizeBytes, $mimeType, $bucket): Video {
             VideoAsset::create([
                 'video_id' => $session->video_id,
                 'type' => AssetType::ORIGINAL,
@@ -234,7 +235,22 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
 
             /** @var Video $video */
             $video = $session->video;
-            $video->update(['status' => VideoStatus::UPLOADED]);
+            $video->update(['status' => VideoStatus::QUEUED]);
+
+            MediaOutboxMessage::create([
+                'event_type' => 'video.uploaded',
+                'aggregate_type' => 'video',
+                'aggregate_id' => $video->id,
+                'payload' => [
+                    'version' => '1.0',
+                    'job_id' => (string) Str::uuid(),
+                    'tenant_id' => $session->tenant_id,
+                    'video_id' => $video->id,
+                    'source_bucket' => $bucket,
+                    'source_key' => $session->object_key,
+                    'created_at' => now()->toIso8601String(),
+                ],
+            ]);
 
             return $video->fresh(['assets', 'uploadSessions']) ?? $video;
         });
