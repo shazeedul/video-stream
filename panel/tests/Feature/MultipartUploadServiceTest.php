@@ -223,7 +223,7 @@ test('complete upload calls completeMultipartUpload and records original video a
     $updatedVideo = $service->completeUpload($session, $parts, $mockS3);
 
     expect($updatedVideo)->toBeInstanceOf(Video::class)
-        ->and($updatedVideo->status)->toBe(VideoStatus::UPLOADED)
+        ->and($updatedVideo->status)->toBe(VideoStatus::QUEUED)
         ->and($session->fresh()->status)->toBe(UploadSessionStatus::COMPLETED);
 
     $asset = VideoAsset::where('video_id', $video->id)->first();
