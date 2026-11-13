@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -147,20 +148,21 @@ func (c *Consumer) consume(ctx context.Context) error {
 	closeChan := make(chan *amqp091.Error, 1)
 	conn.NotifyClose(closeChan)
 
+	consumerTag := fmt.Sprintf("wiz-media-worker-%d-%d", os.Getpid(), time.Now().UnixNano())
 	deliveries, err := ch.Consume(
 		c.cfg.RabbitMQQueue,
-		"",    // consumer tag (auto-generated)
-		false, // auto-ack = false
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil,   // args
+		consumerTag, // Explicit consumer tag for clean cancellation
+		false,       // auto-ack = false
+		false,       // exclusive
+		false,       // no-local
+		false,       // no-wait
+		nil,         // args
 	)
 	if err != nil {
 		return fmt.Errorf("failed to start consuming from queue %s: %w", c.cfg.RabbitMQQueue, err)
 	}
 
-	c.logger.Info("connected to RabbitMQ and waiting for media jobs", "queue", c.cfg.RabbitMQQueue)
+	c.logger.Info("connected to RabbitMQ and waiting for media jobs", "queue", c.cfg.RabbitMQQueue, "consumer_tag", consumerTag)
 
 	sem := make(chan struct{}, c.cfg.Concurrency)
 	var wg sync.WaitGroup
@@ -168,8 +170,8 @@ func (c *Consumer) consume(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			c.logger.Info("graceful shutdown initiated, waiting for in-flight tasks...")
-			_ = ch.Cancel("", false)
+			c.logger.Info("graceful shutdown initiated, cancelling consumer tag and waiting for in-flight tasks...", "consumer_tag", consumerTag)
+			_ = ch.Cancel(consumerTag, false)
 			wg.Wait()
 			return ctx.Err()
 
@@ -205,7 +207,11 @@ func (c *Consumer) consume(ctx context.Context) error {
 }
 
 // HandleMessage parses the message payload, validates it, invokes the pipeline,
-// and handles ACK / NACK routing (NACK without requeue routes directly to DLQ).
+// and handles ACK / NACK routing.
+// - Malformed JSON or invalid schema: NACK without requeue (routes to DLQ).
+// - Context canceled / shutdown: NACK with requeue (redelivery).
+// - Pipeline failure (storage or callback error): NACK with requeue.
+// - Decisively handled jobs (probed or corrupt reported): ACK upon completion.
 func (c *Consumer) HandleMessage(ctx context.Context, msg Message) error {
 	body := msg.Body()
 
@@ -228,6 +234,13 @@ func (c *Consumer) HandleMessage(ctx context.Context, msg Message) error {
 		return fmt.Errorf("invalid schema: %w", err)
 	}
 
+	// Check if context was canceled prior to processing
+	if ctx.Err() != nil {
+		c.logger.WarnContext(ctx, "worker shutting down before job started, requeueing", "job_id", job.JobID)
+		_ = msg.Nack(true) // requeue = true for another worker to pick up
+		return ctx.Err()
+	}
+
 	c.logger.InfoContext(ctx, "dispatching job to pipeline",
 		"job_id", job.JobID,
 		"video_id", job.VideoID,
@@ -239,9 +252,26 @@ func (c *Consumer) HandleMessage(ctx context.Context, msg Message) error {
 			"job_id", job.JobID,
 			"error", err,
 		)
+
+		// If interrupted by context cancellation or if transient error occurred, NACK with requeue
+		if ctx.Err() != nil || errors.Is(err, context.Canceled) {
+			c.logger.WarnContext(ctx, "pipeline interrupted by shutdown, requeueing message", "job_id", job.JobID)
+			_ = msg.Nack(true)
+			return ctx.Err()
+		}
+
+		_ = msg.Nack(true) // requeue = true
+		return fmt.Errorf("pipeline processing failed: %w", err)
 	}
 
-	// ACK message upon pipeline completion
+	// Verify context is still active before acknowledging
+	if ctx.Err() != nil {
+		c.logger.WarnContext(ctx, "worker canceled before acking, requeueing message", "job_id", job.JobID)
+		_ = msg.Nack(true)
+		return ctx.Err()
+	}
+
+	// ACK message upon decisive completion
 	if err := msg.Ack(); err != nil {
 		c.logger.ErrorContext(ctx, "failed to ack message",
 			"job_id", job.JobID,
