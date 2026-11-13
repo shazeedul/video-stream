@@ -40,7 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
-        $middleware->trustProxies(at: ['127.0.0.1', '::1']);
+        $middleware->trustProxies(at: '*');
 
         $middleware->preventRequestForgery(except: [
             'stripe/*',
