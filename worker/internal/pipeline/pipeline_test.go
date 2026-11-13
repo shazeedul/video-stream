@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -38,15 +39,21 @@ func (m *mockInspector) Inspect(ctx context.Context, filePath string) (*probe.Pr
 }
 
 type mockCallbackClient struct {
-	mu       sync.Mutex
-	payloads []callback.Payload
-	err      error
+	mu           sync.Mutex
+	payloads     []callback.Payload
+	err          error
+	statusErrMap map[string]error
 }
 
 func (m *mockCallbackClient) SendStatus(ctx context.Context, payload callback.Payload) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.payloads = append(m.payloads, payload)
+	if m.statusErrMap != nil {
+		if err, ok := m.statusErrMap[payload.Status]; ok {
+			return err
+		}
+	}
 	return m.err
 }
 
@@ -125,8 +132,8 @@ func TestPipeline_Process_Success(t *testing.T) {
 	if payloads[1].Status != callback.StatusProbed {
 		t.Errorf("expected second callback status 'probed', got '%s'", payloads[1].Status)
 	}
-	if payloads[1].DurationSeconds != 120 {
-		t.Errorf("expected duration 120, got %d", payloads[1].DurationSeconds)
+	if payloads[1].DurationSeconds == nil || *payloads[1].DurationSeconds != 120 {
+		t.Errorf("expected duration 120, got %v", payloads[1].DurationSeconds)
 	}
 	if payloads[1].Metadata["format"] != "mp4" {
 		t.Errorf("expected metadata format mp4, got %v", payloads[1].Metadata["format"])
@@ -189,7 +196,7 @@ func TestPipeline_Process_DownloadFailure(t *testing.T) {
 	}
 }
 
-func TestPipeline_Process_ProbeFailure(t *testing.T) {
+func TestPipeline_Process_ProbeFailure_DecisivelyReportedReturnsNil(t *testing.T) {
 	tempDir := t.TempDir()
 	cfg := &config.Config{
 		TempDir: tempDir,
@@ -220,9 +227,11 @@ func TestPipeline_Process_ProbeFailure(t *testing.T) {
 		SourceKey:    "raw/bad.mp4",
 	}
 
+	// Because failure callback succeeds, this unrecoverable file was decisively reported to Laravel
+	// so Process returns nil (allowing consumer to ACK and not loop forever)
 	err := p.Process(context.Background(), job)
-	if err == nil {
-		t.Fatal("expected process to return error on probe failure, got nil")
+	if err != nil {
+		t.Fatalf("expected nil when corrupt file was decisively reported, got %v", err)
 	}
 
 	// Verify temp file was cleaned up despite failure
@@ -236,6 +245,86 @@ func TestPipeline_Process_ProbeFailure(t *testing.T) {
 	}
 	if payloads[1].Status != callback.StatusFailed {
 		t.Errorf("expected status 'failed', got '%s'", payloads[1].Status)
+	}
+}
+
+func TestPipeline_Process_ProbeFailure_CallbackFailsReturnsError(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{
+		TempDir: tempDir,
+	}
+
+	storage := &mockStorage{
+		downloadFn: func(ctx context.Context, bucket, objectKey, destPath string) error {
+			return os.WriteFile(destPath, []byte("corrupt"), 0644)
+		},
+	}
+
+	inspector := &mockInspector{
+		inspectFn: func(ctx context.Context, filePath string) (*probe.ProbeResult, error) {
+			return nil, errors.New("ffprobe failure")
+		},
+	}
+
+	cb := &mockCallbackClient{
+		statusErrMap: map[string]error{
+			callback.StatusFailed: errors.New("network timeout reaching callback endpoint"),
+		},
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	p := pipeline.NewPipeline(cfg, storage, inspector, cb, logger)
+
+	job := pipeline.MediaJob{
+		JobID:        "job-cb-fail",
+		VideoID:      "vid-cb-fail",
+		SourceBucket: "uploads",
+		SourceKey:    "raw/bad.mp4",
+	}
+
+	// When notification fails, Process MUST return error so message can be requeued!
+	err := p.Process(context.Background(), job)
+	if err == nil {
+		t.Fatal("expected error when callback notification fails, got nil")
+	}
+}
+
+func TestPipeline_Process_ErrorTruncation(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := &config.Config{
+		TempDir: tempDir,
+	}
+
+	longErrorMessage := strings.Repeat("A", 3000)
+	storage := &mockStorage{
+		downloadFn: func(ctx context.Context, bucket, objectKey, destPath string) error {
+			return errors.New(longErrorMessage)
+		},
+	}
+
+	cb := &mockCallbackClient{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	p := pipeline.NewPipeline(cfg, storage, &mockInspector{}, cb, logger)
+
+	job := pipeline.MediaJob{
+		JobID:        "job-long-err",
+		VideoID:      "vid-long-err",
+		SourceBucket: "uploads",
+		SourceKey:    "raw/corrupted.mp4",
+	}
+
+	_ = p.Process(context.Background(), job)
+
+	payloads := cb.Payloads()
+	if len(payloads) < 2 {
+		t.Fatalf("expected at least 2 callbacks, got %d", len(payloads))
+	}
+
+	failedPayload := payloads[len(payloads)-1]
+	if len(failedPayload.Error) > 2000 {
+		t.Errorf("expected error string to be <= 2000 characters, got %d", len(failedPayload.Error))
+	}
+	if !strings.HasSuffix(failedPayload.Error, " ... [truncated]") {
+		t.Errorf("expected truncated error to end with ' ... [truncated]', got '%s'", failedPayload.Error[len(failedPayload.Error)-20:])
 	}
 }
 

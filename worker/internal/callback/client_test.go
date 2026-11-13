@@ -12,6 +12,10 @@ import (
 	"wiz-media-worker/internal/callback"
 )
 
+func intPtr(i int) *int {
+	return &i
+}
+
 func TestCallbackClient_SendsInternalSecretHeader(t *testing.T) {
 	var receivedHeader string
 	var receivedPayload callback.Payload
@@ -32,7 +36,7 @@ func TestCallbackClient_SendsInternalSecretHeader(t *testing.T) {
 		JobID:           "019324c4-7bf3-7521-9989-d419b4ef08f1",
 		VideoID:         "019324c3-e836-7db0-bd1b-c40c83a5316e",
 		Status:          callback.StatusProbing,
-		DurationSeconds: 120,
+		DurationSeconds: intPtr(120),
 		Metadata:        map[string]any{"format": "mp4"},
 	})
 
@@ -48,8 +52,42 @@ func TestCallbackClient_SendsInternalSecretHeader(t *testing.T) {
 	if receivedPayload.Status != "probing" {
 		t.Errorf("unexpected status in payload: %s", receivedPayload.Status)
 	}
-	if receivedPayload.DurationSeconds != 120 {
-		t.Errorf("expected duration_seconds 120, got %d", receivedPayload.DurationSeconds)
+	if receivedPayload.DurationSeconds == nil || *receivedPayload.DurationSeconds != 120 {
+		t.Errorf("expected duration_seconds 120, got %v", receivedPayload.DurationSeconds)
+	}
+}
+
+func TestCallbackClient_SerializesZeroDuration(t *testing.T) {
+	var rawBody map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&rawBody); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	defer server.Close()
+
+	client := callback.NewClient(server.URL, "secret")
+	err := client.SendStatus(context.Background(), callback.Payload{
+		JobID:           "job-0",
+		VideoID:         "vid-0",
+		Status:          callback.StatusProbed,
+		DurationSeconds: intPtr(0),
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	durVal, exists := rawBody["duration_seconds"]
+	if !exists {
+		t.Fatal("expected duration_seconds to be present in json when set to 0, but it was omitted")
+	}
+	durFloat, ok := durVal.(float64)
+	if !ok || durFloat != 0 {
+		t.Errorf("expected duration_seconds to be 0, got %v", durVal)
 	}
 }
 

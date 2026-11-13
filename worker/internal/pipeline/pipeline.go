@@ -62,8 +62,11 @@ func NewPipeline(
 // 3. Downloads video from MinIO storage (storage.DownloadSourceFile)
 // 4. Runs FFprobe inspector (probe.Inspect)
 // 5. If probe succeeds: sends callback status: probed, duration_seconds, metadata
-// 6. If probe fails or download fails: sends callback status: failed, error: err.Error()
-// 7. Always cleans up temporary file via defer os.Remove(...)
+// 6. If probe fails: sends callback status: failed, error: truncated err
+//    - If failure callback succeeds: media corruption is decisively reported (returns nil -> message ACKed).
+//    - If failure callback fails: returns error (message NACKed with requeue).
+// 7. If storage download fails: sends callback status: failed, returns error (message NACKed with requeue).
+// 8. Always cleans up temporary file via defer os.Remove(...)
 func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	p.logger.InfoContext(ctx, "processing media job", "job_id", job.JobID, "video_id", job.VideoID)
 
@@ -79,14 +82,14 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	// 2. Prepare temp directory and file path
 	if err := os.MkdirAll(p.cfg.TempDir, 0755); err != nil {
 		failErr := fmt.Errorf("failed to create temp directory %s: %w", p.cfg.TempDir, err)
-		p.notifyFailure(ctx, job, failErr)
+		_ = p.notifyFailure(ctx, job, failErr)
 		return failErr
 	}
 
 	tempFileName := fmt.Sprintf("%s-%s", job.JobID, filepath.Base(job.SourceKey))
 	tempFilePath := filepath.Join(p.cfg.TempDir, tempFileName)
 
-	// 7. Clean up temporary file upon completion
+	// Clean up temporary file upon completion
 	defer func() {
 		if err := os.Remove(tempFilePath); err != nil && !os.IsNotExist(err) {
 			p.logger.WarnContext(ctx, "failed to remove temp file", "file", tempFilePath, "error", err)
@@ -96,7 +99,7 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	// 3. Download video from MinIO storage
 	if err := p.storage.DownloadSourceFile(ctx, job.SourceBucket, job.SourceKey, tempFilePath); err != nil {
 		failErr := fmt.Errorf("download source file failed: %w", err)
-		p.notifyFailure(ctx, job, failErr)
+		_ = p.notifyFailure(ctx, job, failErr)
 		return failErr
 	}
 
@@ -104,16 +107,24 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	result, err := p.probe.Inspect(ctx, tempFilePath)
 	if err != nil {
 		failErr := fmt.Errorf("probe inspection failed: %w", err)
-		p.notifyFailure(ctx, job, failErr)
-		return failErr
+		cbErr := p.notifyFailure(ctx, job, failErr)
+		if cbErr != nil {
+			return fmt.Errorf("probe failed and failure callback failed: %w (probe err: %v)", cbErr, failErr)
+		}
+		p.logger.InfoContext(ctx, "corrupted/invalid media decisively reported to platform as failed",
+			"job_id", job.JobID,
+			"error", failErr,
+		)
+		return nil
 	}
 
 	// 5. Send probed callback with metadata and duration
+	dur := result.DurationSeconds
 	if err := p.callback.SendStatus(ctx, callback.Payload{
 		JobID:           job.JobID,
 		VideoID:         job.VideoID,
 		Status:          callback.StatusProbed,
-		DurationSeconds: result.DurationSeconds,
+		DurationSeconds: &dur,
 		Metadata:        result.ToMetadataMap(),
 	}); err != nil {
 		p.logger.ErrorContext(ctx, "failed to send probed callback", "job_id", job.JobID, "error", err)
@@ -124,14 +135,23 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	return nil
 }
 
-func (p *Pipeline) notifyFailure(ctx context.Context, job MediaJob, err error) {
+func (p *Pipeline) notifyFailure(ctx context.Context, job MediaJob, err error) error {
 	p.logger.ErrorContext(ctx, "media job failed", "job_id", job.JobID, "error", err)
-	if cbErr := p.callback.SendStatus(ctx, callback.Payload{
+
+	errStr := err.Error()
+	if len(errStr) > 1950 {
+		errStr = errStr[:1950] + " ... [truncated]"
+	}
+
+	cbErr := p.callback.SendStatus(ctx, callback.Payload{
 		JobID:   job.JobID,
 		VideoID: job.VideoID,
 		Status:  callback.StatusFailed,
-		Error:   err.Error(),
-	}); cbErr != nil {
+		Error:   errStr,
+	})
+	if cbErr != nil {
 		p.logger.WarnContext(ctx, "failed to send failure callback", "job_id", job.JobID, "error", cbErr)
+		return fmt.Errorf("failure callback failed: %w", cbErr)
 	}
+	return nil
 }

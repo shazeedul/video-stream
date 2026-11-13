@@ -22,7 +22,7 @@ type Payload struct {
 	JobID           string         `json:"job_id"`
 	VideoID         string         `json:"video_id"`
 	Status          string         `json:"status"`
-	DurationSeconds int            `json:"duration_seconds,omitempty"`
+	DurationSeconds *int           `json:"duration_seconds,omitempty"`
 	Metadata        map[string]any `json:"metadata,omitempty"`
 	Error           string         `json:"error,omitempty"`
 }

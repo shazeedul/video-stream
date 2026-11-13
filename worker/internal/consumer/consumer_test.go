@@ -132,7 +132,7 @@ func TestConsumer_HandleMessage_InvalidSchema_NacksWithoutRequeue(t *testing.T) 
 	}
 
 	if len(runner.processedJobs) != 0 {
-		t.Errorf("expected pipeline not to be called, got %d calls", len(runner.processedJobs))
+		t.Errorf("expected pipeline not to be called, but got %d calls", len(runner.processedJobs))
 	}
 	if msg.ackCount != 0 {
 		t.Errorf("expected 0 ack, got %d", msg.ackCount)
@@ -145,10 +145,10 @@ func TestConsumer_HandleMessage_InvalidSchema_NacksWithoutRequeue(t *testing.T) 
 	}
 }
 
-func TestConsumer_HandleMessage_PipelineError_StillAcksOnCompletion(t *testing.T) {
+func TestConsumer_HandleMessage_PipelineError_NacksWithRequeue(t *testing.T) {
 	cfg := &config.Config{Concurrency: 2}
 	runner := &mockPipelineRunner{
-		err: errors.New("ffprobe failed and failure callback dispatched"),
+		err: errors.New("storage download failed due to network timeout"),
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	c := consumer.NewConsumer(cfg, runner, logger)
@@ -158,22 +158,62 @@ func TestConsumer_HandleMessage_PipelineError_StillAcksOnCompletion(t *testing.T
 		"job_id": "job-123",
 		"video_id": "video-123",
 		"source_bucket": "bucket",
-		"source_key": "corrupted.mp4"
+		"source_key": "raw.mp4"
 	}`)
 	msg := &mockMessage{body: payload}
 
 	err := c.HandleMessage(context.Background(), msg)
-	if err != nil {
-		t.Fatalf("expected nil error since message was handled and acked, got %v", err)
+	if err == nil {
+		t.Fatal("expected error when pipeline returns error, got nil")
 	}
 
 	if len(runner.processedJobs) != 1 {
 		t.Fatalf("expected 1 pipeline run, got %d", len(runner.processedJobs))
 	}
-	if msg.ackCount != 1 {
-		t.Errorf("expected 1 ack upon pipeline completion, got %d", msg.ackCount)
+	// On transient pipeline failure, message MUST NOT be ACKed, but NACKed with requeue=true
+	if msg.ackCount != 0 {
+		t.Errorf("expected 0 ack on pipeline error, got %d", msg.ackCount)
 	}
-	if msg.nackCount != 0 {
-		t.Errorf("expected 0 nack, got %d", msg.nackCount)
+	if msg.nackCount != 1 {
+		t.Fatalf("expected 1 nack, got %d", msg.nackCount)
+	}
+	if msg.lastRequeue != true {
+		t.Errorf("expected nack requeue = true for redelivery, got false")
+	}
+}
+
+func TestConsumer_HandleMessage_ShutdownContext_NacksWithRequeue(t *testing.T) {
+	cfg := &config.Config{Concurrency: 2}
+	runner := &mockPipelineRunner{}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	c := consumer.NewConsumer(cfg, runner, logger)
+
+	payload := []byte(`{
+		"version": "1.0",
+		"job_id": "job-123",
+		"video_id": "video-123",
+		"source_bucket": "bucket",
+		"source_key": "raw.mp4"
+	}`)
+	msg := &mockMessage{body: payload}
+
+	// Context canceled before invocation
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := c.HandleMessage(ctx, msg)
+	if err == nil {
+		t.Fatal("expected error when context is canceled, got nil")
+	}
+
+	// Must NOT be ACKed on shutdown; must be NACKed with requeue=true
+	if msg.ackCount != 0 {
+		t.Errorf("expected 0 ack on shutdown, got %d", msg.ackCount)
+	}
+	if msg.nackCount != 1 {
+		t.Fatalf("expected 1 nack, got %d", msg.nackCount)
+	}
+	if msg.lastRequeue != true {
+		t.Errorf("expected nack requeue = true for redelivery on shutdown, got false")
 	}
 }
