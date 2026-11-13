@@ -24,6 +24,7 @@
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.9",
         "league/flysystem-aws-s3-v3": "^3.35",
+        "php-amqplib/php-amqplib": "^2.8",
         "predis/predis": "^3.2",
         "pusher/pusher-php-server": "^7.2",
         "spatie/laravel-permission": "^7.0",
