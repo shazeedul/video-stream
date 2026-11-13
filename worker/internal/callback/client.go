@@ -10,6 +10,21 @@ import (
 	"time"
 )
 
+// ClientError represents a client-side (4xx) HTTP error returned by the callback endpoint.
+type ClientError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *ClientError) Error() string {
+	return e.Message
+}
+
+// IsNotFoundOrUnprocessable returns true if the error indicates a missing (404) or unprocessable (422) entity.
+func (e *ClientError) IsNotFoundOrUnprocessable() bool {
+	return e.StatusCode == http.StatusNotFound || e.StatusCode == http.StatusUnprocessableEntity
+}
+
 // Status constants for media processing callback.
 const (
 	StatusProbing = "probing"
@@ -133,7 +148,14 @@ func (c *Client) SendStatus(ctx context.Context, payload Payload) error {
 			continue
 		}
 
-		// Client errors (4xx) or unexpected status codes should not be retried
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			return &ClientError{
+				StatusCode: resp.StatusCode,
+				Message:    fmt.Sprintf("callback server returned client error status %d", resp.StatusCode),
+			}
+		}
+
+		// Unexpected status codes should not be retried
 		return fmt.Errorf("callback server returned status %d", resp.StatusCode)
 	}
 

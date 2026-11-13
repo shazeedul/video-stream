@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"wiz-media-worker/internal/callback"
 	"wiz-media-worker/internal/config"
 	"wiz-media-worker/internal/pipeline"
 )
@@ -248,6 +249,23 @@ func (c *Consumer) HandleMessage(ctx context.Context, msg Message) error {
 
 	// Dispatch to pipeline
 	if err := c.pipeline.Process(ctx, job); err != nil {
+		var clientErr *callback.ClientError
+		if errors.Is(err, pipeline.ErrJobDiscarded) || (errors.As(err, &clientErr) && clientErr.IsNotFoundOrUnprocessable()) {
+			c.logger.WarnContext(ctx, "video deleted or unprocessable in panel, discarding job from queue",
+				"job_id", job.JobID,
+				"video_id", job.VideoID,
+				"error", err,
+			)
+			if ackErr := msg.Ack(); ackErr != nil {
+				c.logger.ErrorContext(ctx, "failed to ack discarded job",
+					"job_id", job.JobID,
+					"error", ackErr,
+				)
+				return fmt.Errorf("failed to ack discarded job: %w", ackErr)
+			}
+			return nil
+		}
+
 		c.logger.ErrorContext(ctx, "pipeline processing reported failure",
 			"job_id", job.JobID,
 			"error", err,
