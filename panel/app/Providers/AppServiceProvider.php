@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
+use App\Domain\Processing\Services\RabbitMQPublisherService;
 use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Tenants\Services\TenantContextService;
@@ -32,6 +34,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(TenantContextServiceInterface::class, TenantContextService::class);
         $this->app->bind(MultipartUploadServiceInterface::class, MinioMultipartUploadService::class);
+        $this->app->bind(RabbitMQPublisherInterface::class, RabbitMQPublisherService::class);
     }
 
     /**

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domain\Processing\Services;
 
+use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Wire\AMQPTable;
+use Throwable;
 
-class RabbitMQPublisherService
+final class RabbitMQPublisherService implements RabbitMQPublisherInterface
 {
     private ?AMQPStreamConnection $connection = null;
 
@@ -24,7 +26,11 @@ class RabbitMQPublisherService
 
     public function __destruct()
     {
-        $this->close();
+        try {
+            $this->close();
+        } catch (Throwable) {
+            // Suppress exceptions during shutdown to prevent fatal errors
+        }
     }
 
     public function setupTopology(): void
