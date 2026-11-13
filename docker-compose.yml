@@ -73,12 +73,34 @@ services:
       MINIO_SECRET_KEY: minioadmin
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
+      INTERNAL_API_SECRET: "${INTERNAL_API_SECRET:-internal-worker-secret-key-12345}"
     volumes:
       - ./panel:/var/www/html
     depends_on:
       - postgres
       - redis
       - minio
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: wiz_worker
+    restart: unless-stopped
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_QUEUE: media.jobs
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_USE_SSL: "false"
+      INTERNAL_CALLBACK_URL: http://panel:8000/api/v1/internal/processing/callback
+      INTERNAL_API_SECRET: "${INTERNAL_API_SECRET:-internal-worker-secret-key-12345}"
+      CONCURRENCY: 2
+    depends_on:
+      - rabbitmq
+      - minio
+      - panel
 
   nginx:
     image: nginx:alpine
