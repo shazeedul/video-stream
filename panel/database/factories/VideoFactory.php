@@ -59,6 +59,16 @@ final class VideoFactory extends Factory
     }
 
     /**
+     * Indicate the tenant that owns the video.
+     */
+    public function forTenant(Tenant $tenant): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'tenant_id' => $tenant->id,
+        ]);
+    }
+
+    /**
      * Indicate that the video is ready.
      */
     public function ready(): static

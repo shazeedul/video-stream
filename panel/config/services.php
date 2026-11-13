@@ -72,4 +72,8 @@ return [
         'client_secret' => env('LINKEDIN_CLIENT_SECRET'),
         'redirect' => env('APP_URL').'/auth/linkedin/callback',
     ],
+
+    'internal' => [
+        'secret' => env('INTERNAL_API_SECRET', 'internal-worker-secret-key-12345'),
+    ],
 ];
