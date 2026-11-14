@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Playback\Contracts\PlaybackTokenServiceInterface;
+use App\Domain\Playback\Services\PlaybackTokenService;
 use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
 use App\Domain\Processing\Services\RabbitMQPublisherService;
 use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
@@ -35,6 +37,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(TenantContextServiceInterface::class, TenantContextService::class);
         $this->app->bind(MultipartUploadServiceInterface::class, MinioMultipartUploadService::class);
         $this->app->bind(RabbitMQPublisherInterface::class, RabbitMQPublisherService::class);
+        $this->app->singleton(PlaybackTokenServiceInterface::class, PlaybackTokenService::class);
     }
 
     /**
