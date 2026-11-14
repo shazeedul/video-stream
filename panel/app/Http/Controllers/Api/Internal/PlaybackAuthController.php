@@ -21,7 +21,14 @@ final class PlaybackAuthController extends Controller
         Request $request,
         PlaybackTokenServiceInterface $playbackTokenService,
     ): Response {
-        $videoId = (string) ($request->query('video_id') ?? $request->header('X-Video-Id') ?? '');
+        $headerVideoId = (string) $request->header('X-Video-Id', '');
+        $queryVideoId = (string) $request->query('video_id', '');
+
+        if ($headerVideoId !== '' && $queryVideoId !== '' && $headerVideoId !== $queryVideoId) {
+            return response('Conflicting video identifiers', 400);
+        }
+
+        $videoId = $headerVideoId !== '' ? $headerVideoId : $queryVideoId;
 
         if ($videoId === '') {
             return response('Missing video identifier', 400);
