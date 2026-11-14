@@ -253,3 +253,60 @@ func TestCallbackClient_ReturnsClientErrorFor4xx(t *testing.T) {
 		server.Close()
 	}
 }
+
+func TestCallbackClient_SerializesReadyWithAssetsAndThumbnail(t *testing.T) {
+	var receivedPayload callback.Payload
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	defer server.Close()
+
+	client := callback.NewClient(server.URL, "secret")
+	err := client.SendStatus(context.Background(), callback.Payload{
+		JobID:        "job-ready",
+		VideoID:      "vid-ready",
+		Status:       callback.StatusReady,
+		ThumbnailKey: "tenants/t1/videos/v1/thumbnail.jpg",
+		Assets: []callback.AssetPayload{
+			{
+				Type:      "master",
+				Disk:      "minio-processed",
+				ObjectKey: "tenants/t1/videos/v1/hls/master.m3u8",
+				SizeBytes: 512,
+				MimeType:  "application/x-mpegURL",
+			},
+			{
+				Type:      "thumbnail",
+				Disk:      "thumbnails",
+				ObjectKey: "tenants/t1/videos/v1/thumbnail.jpg",
+				SizeBytes: 2048,
+				MimeType:  "image/jpeg",
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if receivedPayload.Status != callback.StatusReady {
+		t.Errorf("expected status 'ready', got '%s'", receivedPayload.Status)
+	}
+	if receivedPayload.ThumbnailKey != "tenants/t1/videos/v1/thumbnail.jpg" {
+		t.Errorf("expected thumbnail key, got '%s'", receivedPayload.ThumbnailKey)
+	}
+	if len(receivedPayload.Assets) != 2 {
+		t.Fatalf("expected 2 assets, got %d", len(receivedPayload.Assets))
+	}
+	if receivedPayload.Assets[0].Type != "master" || receivedPayload.Assets[0].SizeBytes != 512 {
+		t.Errorf("unexpected asset 0: %+v", receivedPayload.Assets[0])
+	}
+	if receivedPayload.Assets[1].Type != "thumbnail" || receivedPayload.Assets[1].MimeType != "image/jpeg" {
+		t.Errorf("unexpected asset 1: %+v", receivedPayload.Assets[1])
+	}
+}

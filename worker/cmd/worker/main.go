@@ -14,6 +14,8 @@ import (
 	"wiz-media-worker/internal/pipeline"
 	"wiz-media-worker/internal/probe"
 	"wiz-media-worker/internal/storage"
+	"wiz-media-worker/internal/thumbnail"
+	"wiz-media-worker/internal/transcoder"
 )
 
 func main() {
@@ -31,6 +33,8 @@ func main() {
 		"concurrency", cfg.Concurrency,
 		"temp_dir", cfg.TempDir,
 		"minio_endpoint", cfg.MinioEndpoint,
+		"processed_bucket", cfg.MinioProcessedBucket,
+		"thumbnails_bucket", cfg.MinioThumbnailsBucket,
 		"callback_url", cfg.InternalCallbackURL,
 	)
 
@@ -44,11 +48,26 @@ func main() {
 	// Initialize probe inspector (defaults to "ffprobe" binary in PATH)
 	inspector := probe.NewInspector("")
 
+	// Initialize transcoder (defaults to "ffmpeg" binary in PATH)
+	transcoderClient := transcoder.NewTranscoder("")
+
+	// Initialize thumbnail generator (defaults to "ffmpeg" binary in PATH)
+	thumbnailGen := thumbnail.NewGenerator("")
+
 	// Initialize HTTP callback client
 	callbackClient := callback.NewClient(cfg.InternalCallbackURL, cfg.InternalAPISecret)
 
 	// Initialize media pipeline orchestrator
-	mediaPipeline := pipeline.NewPipeline(cfg, storageClient, inspector, callbackClient, logger)
+	mediaPipeline := pipeline.NewPipeline(
+		cfg,
+		storageClient,
+		inspector,
+		transcoderClient,
+		thumbnailGen,
+		storageClient,
+		callbackClient,
+		logger,
+	)
 
 	// Initialize RabbitMQ consumer daemon
 	mediaConsumer := consumer.NewConsumer(cfg, mediaPipeline, logger)

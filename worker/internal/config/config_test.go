@@ -37,6 +37,8 @@ func TestLoadConfig_AllDefaults(t *testing.T) {
 		"MINIO_ACCESS_KEY",
 		"MINIO_SECRET_KEY",
 		"MINIO_USE_SSL",
+		"MINIO_PROCESSED_BUCKET",
+		"MINIO_THUMBNAILS_BUCKET",
 		"INTERNAL_CALLBACK_URL",
 		"INTERNAL_API_SECRET",
 		"CONCURRENCY",
@@ -75,6 +77,12 @@ func TestLoadConfig_AllDefaults(t *testing.T) {
 	if cfg.MinioUseSSL != false {
 		t.Errorf("unexpected default MinioUseSSL: %v", cfg.MinioUseSSL)
 	}
+	if cfg.MinioProcessedBucket != "videos-processed" {
+		t.Errorf("unexpected default MinioProcessedBucket: %s", cfg.MinioProcessedBucket)
+	}
+	if cfg.MinioThumbnailsBucket != "thumbnails" {
+		t.Errorf("unexpected default MinioThumbnailsBucket: %s", cfg.MinioThumbnailsBucket)
+	}
 	if cfg.InternalCallbackURL != "http://panel:8000/api/v1/internal/processing/callback" {
 		t.Errorf("unexpected default InternalCallbackURL: %s", cfg.InternalCallbackURL)
 	}
@@ -95,6 +103,8 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 	os.Setenv("MINIO_ACCESS_KEY", "custom-user")
 	os.Setenv("MINIO_SECRET_KEY", "custom-password")
 	os.Setenv("MINIO_USE_SSL", "true")
+	os.Setenv("MINIO_PROCESSED_BUCKET", "custom-processed")
+	os.Setenv("MINIO_THUMBNAILS_BUCKET", "custom-thumbs")
 	os.Setenv("INTERNAL_CALLBACK_URL", "https://api.example.com/callback")
 	os.Setenv("WORKER_CONCURRENCY", "8")
 	os.Setenv("WORKER_TEMP_DIR", "/custom/tmp")
@@ -105,6 +115,8 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 		os.Unsetenv("MINIO_ACCESS_KEY")
 		os.Unsetenv("MINIO_SECRET_KEY")
 		os.Unsetenv("MINIO_USE_SSL")
+		os.Unsetenv("MINIO_PROCESSED_BUCKET")
+		os.Unsetenv("MINIO_THUMBNAILS_BUCKET")
 		os.Unsetenv("INTERNAL_CALLBACK_URL")
 		os.Unsetenv("WORKER_CONCURRENCY")
 		os.Unsetenv("WORKER_TEMP_DIR")
@@ -129,6 +141,12 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 	}
 	if cfg.MinioUseSSL != true {
 		t.Errorf("unexpected MinioUseSSL: %v", cfg.MinioUseSSL)
+	}
+	if cfg.MinioProcessedBucket != "custom-processed" {
+		t.Errorf("unexpected MinioProcessedBucket: %s", cfg.MinioProcessedBucket)
+	}
+	if cfg.MinioThumbnailsBucket != "custom-thumbs" {
+		t.Errorf("unexpected MinioThumbnailsBucket: %s", cfg.MinioThumbnailsBucket)
 	}
 	if cfg.InternalCallbackURL != "https://api.example.com/callback" {
 		t.Errorf("unexpected InternalCallbackURL: %s", cfg.InternalCallbackURL)

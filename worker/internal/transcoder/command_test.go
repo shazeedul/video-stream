@@ -101,3 +101,23 @@ func TestBuildFFmpegArgs_PerStreamEncodingFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildFFmpegArgs_NoAudio(t *testing.T) {
+	profiles := []transcoder.Profile{
+		{Name: "720p", Width: 1280, Height: 720, VideoBitrate: "2500k", MaxRate: "2800k", BufSize: "5000k", AudioBitrate: "128k", ProfileLevel: "high"},
+		{Name: "360p", Width: 640, Height: 360, VideoBitrate: "600k", MaxRate: "700k", BufSize: "1200k", AudioBitrate: "64k", ProfileLevel: "main"},
+	}
+
+	args := transcoder.BuildFFmpegArgs("/tmp/input.mp4", "/tmp/hls_out", profiles, transcoder.WithAudio(false))
+	cmdLine := strings.Join(args, " ")
+
+	if strings.Contains(cmdLine, "-map a:0?") {
+		t.Errorf("expected no audio map when WithAudio(false), got: %s", cmdLine)
+	}
+	if strings.Contains(cmdLine, "aac") {
+		t.Errorf("expected no aac codec when WithAudio(false), got: %s", cmdLine)
+	}
+	if !strings.Contains(cmdLine, "-var_stream_map v:0 v:1") {
+		t.Errorf("expected var_stream_map 'v:0 v:1', got: %s", cmdLine)
+	}
+}

@@ -27,10 +27,22 @@ func (e *ClientError) IsNotFoundOrUnprocessable() bool {
 
 // Status constants for media processing callback.
 const (
-	StatusProbing = "probing"
-	StatusProbed  = "probed"
-	StatusFailed  = "failed"
+	StatusProbing     = "probing"
+	StatusProbed      = "probed"
+	StatusTranscoding = "transcoding"
+	StatusReady       = "ready"
+	StatusFailed      = "failed"
 )
+
+// AssetPayload describes a generated asset or thumbnail returned to the callback endpoint.
+type AssetPayload struct {
+	Type      string         `json:"type"`
+	Disk      string         `json:"disk"`
+	ObjectKey string         `json:"object_key"`
+	SizeBytes int64          `json:"size_bytes"`
+	MimeType  string         `json:"mime_type"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+}
 
 // Payload represents the request body sent to the Laravel callback endpoint.
 type Payload struct {
@@ -38,6 +50,8 @@ type Payload struct {
 	VideoID         string         `json:"video_id"`
 	Status          string         `json:"status"`
 	DurationSeconds *int           `json:"duration_seconds,omitempty"`
+	ThumbnailKey    string         `json:"thumbnail_key,omitempty"`
+	Assets          []AssetPayload `json:"assets,omitempty"`
 	Metadata        map[string]any `json:"metadata,omitempty"`
 	Error           string         `json:"error,omitempty"`
 }
