@@ -326,3 +326,54 @@ test('deleting video aborts pending upload sessions to clean up partial chunks',
 
     expect(Video::find($video->id))->toBeNull();
 });
+
+test('ready video show page includes signed playback url', function (): void {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create();
+    $tenant->users()->attach($user->id, ['id' => (string) str()->uuid(), 'role' => TenantRole::MEMBER->value]);
+
+    app()->instance('current_tenant', $tenant);
+
+    $readyVideo = Video::factory()->create([
+        'tenant_id' => $tenant->id,
+        'status' => VideoStatus::READY,
+        'title' => 'Ready Stream Video',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('portal.videos.show', $readyVideo))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('portal/videos/show')
+            ->where('video.id', $readyVideo->id)
+            ->where('video.playback_url', fn ($url) => is_string($url) && str_contains($url, '/playback/'.$readyVideo->id.'/master.m3u8?token=') && str_contains($url, 'expires='))
+            ->where('playback_url', fn ($url) => is_string($url) && str_contains($url, '/playback/'.$readyVideo->id.'/master.m3u8?token=') && str_contains($url, 'expires='))
+        );
+
+    $draftVideo = Video::factory()->create([
+        'tenant_id' => $tenant->id,
+        'status' => VideoStatus::DRAFT,
+        'title' => 'Draft Video',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('portal.videos.show', $draftVideo))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('portal/videos/show')
+            ->where('video.id', $draftVideo->id)
+            ->where('playback_url', null)
+        );
+
+    $uploadingVideo = Video::factory()->create([
+        'tenant_id' => $tenant->id,
+        'status' => VideoStatus::UPLOADING,
+        'title' => 'Uploading Video',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('portal.videos.show', $uploadingVideo))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('portal/videos/show')
+            ->where('video.id', $uploadingVideo->id)
+            ->where('playback_url', null)
+        );
+});
