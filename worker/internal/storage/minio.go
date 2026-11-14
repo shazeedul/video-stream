@@ -12,9 +12,15 @@ import (
 	"wiz-media-worker/internal/config"
 )
 
+// ObjectUploader abstracts the MinIO FPutObject functionality for uploading files.
+type ObjectUploader interface {
+	FPutObject(ctx context.Context, bucketName, objectName, filePath string, opts minio.PutObjectOptions) (info minio.UploadInfo, err error)
+}
+
 // MinioStorage wraps the MinIO client to provide object storage operations.
 type MinioStorage struct {
-	client *minio.Client
+	client   *minio.Client
+	uploader ObjectUploader
 }
 
 // NewMinioClient initializes and returns a new MinioStorage client from the application config.
@@ -34,7 +40,30 @@ func NewMinioClient(cfg *config.Config) (*MinioStorage, error) {
 		return nil, fmt.Errorf("failed to initialize minio client: %w", err)
 	}
 
-	return &MinioStorage{client: client}, nil
+	return &MinioStorage{
+		client:   client,
+		uploader: client,
+	}, nil
+}
+
+// NewTestStorage creates a MinioStorage instance backed by a custom ObjectUploader for testing.
+func NewTestStorage(uploader ObjectUploader) *MinioStorage {
+	return &MinioStorage{
+		uploader: uploader,
+	}
+}
+
+// SetUploader sets the ObjectUploader used for uploads.
+func (s *MinioStorage) SetUploader(u ObjectUploader) {
+	s.uploader = u
+}
+
+// getUploader returns the active ObjectUploader.
+func (s *MinioStorage) getUploader() ObjectUploader {
+	if s.uploader != nil {
+		return s.uploader
+	}
+	return s.client
 }
 
 // cleanEndpoint strips any URL scheme and trailing slashes so minio-go can parse it.
