@@ -27,10 +27,18 @@ final class ProcessingCallbackRequest extends FormRequest
         return [
             'job_id' => ['required', 'uuid'],
             'video_id' => ['required', 'uuid', 'exists:videos,id'],
-            'status' => ['required', 'string', 'in:probing,probed,failed'],
+            'status' => ['required', 'string', 'in:probing,transcoding,packaging,probed,ready,failed'],
             'duration_seconds' => ['nullable', 'integer', 'min:0'],
             'metadata' => ['nullable', 'array'],
             'error' => ['nullable', 'string', 'max:2000'],
+            'thumbnail_key' => ['nullable', 'string', 'max:500'],
+            'assets' => ['nullable', 'array'],
+            'assets.*.type' => ['required', 'string'],
+            'assets.*.disk' => ['required', 'string'],
+            'assets.*.object_key' => ['required', 'string'],
+            'assets.*.size_bytes' => ['required', 'integer', 'min:0'],
+            'assets.*.mime_type' => ['required', 'string'],
+            'assets.*.metadata' => ['nullable', 'array'],
         ];
     }
 }

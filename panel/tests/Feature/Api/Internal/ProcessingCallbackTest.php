@@ -7,8 +7,10 @@ namespace Tests\Feature\Api\Internal;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Videos\Models\Video;
 use App\Enums\VideoStatus;
+use App\Events\Videos\VideoStatusUpdated;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 final class ProcessingCallbackTest extends TestCase
@@ -141,5 +143,140 @@ final class ProcessingCallbackTest extends TestCase
         $fresh = $video->fresh();
         $this->assertEquals(VideoStatus::FAILED, $fresh->status);
         $this->assertEquals('Unsupported container format or corrupt file header', $fresh->metadata['error']);
+    }
+
+    public function test_it_transitions_video_to_transcoding(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $user = User::factory()->create();
+        $video = Video::factory()->forTenant($tenant)->create([
+            'user_id' => $user->id,
+            'status' => VideoStatus::PROBING,
+        ]);
+
+        $response = $this->withHeaders(['X-Internal-Secret' => $this->secret])
+            ->postJson('/api/v1/internal/processing/callback', [
+                'job_id' => '019324c4-7bf3-7521-9989-d419b4ef08f1',
+                'video_id' => $video->id,
+                'status' => 'transcoding',
+            ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'video_id' => $video->id,
+            ]);
+        $this->assertEquals(VideoStatus::TRANSCODING, $video->fresh()->status);
+    }
+
+    public function test_it_transitions_video_to_packaging(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $user = User::factory()->create();
+        $video = Video::factory()->forTenant($tenant)->create([
+            'user_id' => $user->id,
+            'status' => VideoStatus::TRANSCODING,
+        ]);
+
+        $response = $this->withHeaders(['X-Internal-Secret' => $this->secret])
+            ->postJson('/api/v1/internal/processing/callback', [
+                'job_id' => '019324c4-7bf3-7521-9989-d419b4ef08f1',
+                'video_id' => $video->id,
+                'status' => 'packaging',
+            ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'video_id' => $video->id,
+            ]);
+        $this->assertEquals(VideoStatus::PACKAGING, $video->fresh()->status);
+    }
+
+    public function test_it_registers_assets_and_marks_video_ready(): void
+    {
+        Event::fake([VideoStatusUpdated::class]);
+
+        $tenant = Tenant::factory()->create();
+        $user = User::factory()->create();
+        $video = Video::factory()->forTenant($tenant)->create([
+            'user_id' => $user->id,
+            'status' => VideoStatus::TRANSCODING,
+        ]);
+
+        $assets = [
+            [
+                'type' => 'master',
+                'disk' => 'minio-processed',
+                'object_key' => "tenants/{$tenant->id}/videos/{$video->id}/hls/master.m3u8",
+                'size_bytes' => 1024,
+                'mime_type' => 'application/x-mpegURL',
+                'metadata' => ['renditions' => ['1080p', '720p']],
+            ],
+            [
+                'type' => 'hls_playlist',
+                'disk' => 'minio-processed',
+                'object_key' => "tenants/{$tenant->id}/videos/{$video->id}/hls/stream_0.m3u8",
+                'size_bytes' => 4096,
+                'mime_type' => 'application/x-mpegURL',
+                'metadata' => ['resolution' => '1080p'],
+            ],
+            [
+                'type' => 'thumbnail',
+                'disk' => 'thumbnails',
+                'object_key' => "tenants/{$tenant->id}/videos/{$video->id}/thumbnail.jpg",
+                'size_bytes' => 65536,
+                'mime_type' => 'image/jpeg',
+            ],
+        ];
+
+        $response = $this->withHeaders(['X-Internal-Secret' => $this->secret])
+            ->postJson('/api/v1/internal/processing/callback', [
+                'job_id' => '019324c4-7bf3-7521-9989-d419b4ef08f1',
+                'video_id' => $video->id,
+                'status' => 'ready',
+                'duration_seconds' => 120,
+                'thumbnail_key' => "tenants/{$tenant->id}/videos/{$video->id}/thumbnail.jpg",
+                'assets' => $assets,
+            ]);
+
+        $response->assertOk();
+        $fresh = $video->fresh();
+        $this->assertEquals(VideoStatus::READY, $fresh->status);
+        $this->assertEquals("tenants/{$tenant->id}/videos/{$video->id}/thumbnail.jpg", $fresh->thumbnail_path);
+        $this->assertEquals(120, $fresh->duration_seconds);
+        $this->assertCount(3, $fresh->assets);
+        $this->assertDatabaseHas('video_assets', [
+            'video_id' => $video->id,
+            'type' => 'master',
+            'object_key' => "tenants/{$tenant->id}/videos/{$video->id}/hls/master.m3u8",
+        ]);
+
+        Event::assertDispatched(VideoStatusUpdated::class, function (VideoStatusUpdated $event) use ($video) {
+            return $event->video->id === $video->id;
+        });
+    }
+
+    public function test_video_status_updated_broadcast_payload_and_channel(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $user = User::factory()->create();
+        $video = Video::factory()->forTenant($tenant)->create([
+            'user_id' => $user->id,
+            'status' => VideoStatus::READY,
+            'thumbnail_path' => 'thumb.jpg',
+            'duration_seconds' => 120,
+        ]);
+
+        $event = new VideoStatusUpdated($video);
+        $channels = $event->broadcastOn();
+        $this->assertCount(1, $channels);
+        $this->assertEquals("private-tenant.{$tenant->id}", $channels[0]->name);
+        $this->assertEquals([
+            'video_id' => $video->id,
+            'status' => 'ready',
+            'thumbnail_path' => 'thumb.jpg',
+            'duration_seconds' => 120,
+        ], $event->broadcastWith());
     }
 }

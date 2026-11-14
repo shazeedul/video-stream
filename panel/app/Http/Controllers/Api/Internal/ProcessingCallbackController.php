@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\Internal;
 
 use App\Domain\Videos\Models\Video;
+use App\Domain\Videos\Services\VideoAssetRegistrationService;
 use App\Enums\VideoStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Internal\ProcessingCallbackRequest;
@@ -15,8 +16,10 @@ final class ProcessingCallbackController extends Controller
     /**
      * Handle the processing callback from the background worker.
      */
-    public function __invoke(ProcessingCallbackRequest $request): JsonResponse
-    {
+    public function __invoke(
+        ProcessingCallbackRequest $request,
+        VideoAssetRegistrationService $assetRegistrationService,
+    ): JsonResponse {
         $validated = $request->validated();
 
         /** @var Video $video */
@@ -35,6 +38,23 @@ final class ProcessingCallbackController extends Controller
             if (isset($validated['duration_seconds'])) {
                 $video->duration_seconds = (int) $validated['duration_seconds'];
             }
+        } elseif ($status === 'transcoding') {
+            $video->status = VideoStatus::TRANSCODING;
+        } elseif ($status === 'packaging') {
+            $video->status = VideoStatus::PACKAGING;
+        } elseif ($status === 'ready') {
+            $video->metadata = $metadata;
+            $video = $assetRegistrationService->registerProcessedAssets(
+                $video,
+                $validated['assets'] ?? [],
+                $validated['thumbnail_key'] ?? null,
+                isset($validated['duration_seconds']) ? (int) $validated['duration_seconds'] : null,
+            );
+
+            return response()->json([
+                'success' => true,
+                'video_id' => $video->id,
+            ]);
         } elseif ($status === 'failed') {
             $video->status = VideoStatus::FAILED;
             if (! empty($validated['error'])) {
