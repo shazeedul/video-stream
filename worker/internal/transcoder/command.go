@@ -5,10 +5,33 @@ import (
 	"strings"
 )
 
+// TranscodeConfig holds options for transcoding.
+type TranscodeConfig struct {
+	HasAudio bool
+}
+
+// TranscodeOption configures transcode execution.
+type TranscodeOption func(*TranscodeConfig)
+
+// WithAudio specifies whether the input video has an audio stream.
+// Defaults to true if not specified.
+func WithAudio(hasAudio bool) TranscodeOption {
+	return func(c *TranscodeConfig) {
+		c.HasAudio = hasAudio
+	}
+}
+
 // BuildFFmpegArgs builds dynamic FFmpeg command arguments for single-pass multi-variant HLS transcoding.
-func BuildFFmpegArgs(sourcePath, outputDir string, profiles []Profile) []string {
+func BuildFFmpegArgs(sourcePath, outputDir string, profiles []Profile, opts ...TranscodeOption) []string {
 	if len(profiles) == 0 {
 		return nil
+	}
+
+	cfg := TranscodeConfig{
+		HasAudio: true,
+	}
+	for _, opt := range opts {
+		opt(&cfg)
 	}
 
 	cleanOutputDir := strings.TrimRight(outputDir, "/\\")
@@ -38,7 +61,7 @@ func BuildFFmpegArgs(sourcePath, outputDir string, profiles []Profile) []string 
 	varStreamMaps := make([]string, 0, len(profiles))
 
 	for i, p := range profiles {
-		args = append(args,
+		streamArgs := []string{
 			"-map", fmt.Sprintf("[v%dout]", i),
 			fmt.Sprintf("-c:v:%d", i), "libx264",
 			"-preset", "veryfast",
@@ -49,12 +72,19 @@ func BuildFFmpegArgs(sourcePath, outputDir string, profiles []Profile) []string 
 			"-g", "48",
 			"-keyint_min", "48",
 			"-sc_threshold", "0",
-			"-map", "a:0?",
-			fmt.Sprintf("-c:a:%d", i), "aac",
-			fmt.Sprintf("-b:a:%d", i), p.AudioBitrate,
-			"-ac", "2",
-		)
-		varStreamMaps = append(varStreamMaps, fmt.Sprintf("v:%d,a:%d", i, i))
+		}
+		if cfg.HasAudio {
+			streamArgs = append(streamArgs,
+				"-map", "a:0?",
+				fmt.Sprintf("-c:a:%d", i), "aac",
+				fmt.Sprintf("-b:a:%d", i), p.AudioBitrate,
+				"-ac", "2",
+			)
+			varStreamMaps = append(varStreamMaps, fmt.Sprintf("v:%d,a:%d", i, i))
+		} else {
+			varStreamMaps = append(varStreamMaps, fmt.Sprintf("v:%d", i))
+		}
+		args = append(args, streamArgs...)
 	}
 
 	args = append(args,

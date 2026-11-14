@@ -8,31 +8,35 @@ import (
 
 // Config holds the application configuration loaded from environment variables.
 type Config struct {
-	RabbitMQURL         string
-	RabbitMQQueue       string
-	MinioEndpoint       string
-	MinioAccessKey      string
-	MinioSecretKey      string
-	MinioUseSSL         bool
-	InternalCallbackURL string
-	InternalAPISecret   string
-	Concurrency         int
-	TempDir             string
+	RabbitMQURL           string
+	RabbitMQQueue         string
+	MinioEndpoint         string
+	MinioAccessKey        string
+	MinioSecretKey        string
+	MinioUseSSL           bool
+	MinioProcessedBucket  string
+	MinioThumbnailsBucket string
+	InternalCallbackURL   string
+	InternalAPISecret     string
+	Concurrency           int
+	TempDir               string
 }
 
 // Load loads the configuration from environment variables with sensible defaults.
 func Load() (*Config, error) {
 	cfg := &Config{
-		RabbitMQURL:         getEnv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/"),
-		RabbitMQQueue:       getEnv("RABBITMQ_QUEUE", "media.jobs"),
-		MinioEndpoint:       getEnv("MINIO_ENDPOINT", "minio:9000"),
-		MinioAccessKey:      getEnv("MINIO_ACCESS_KEY", "minioadmin"),
-		MinioSecretKey:      getEnv("MINIO_SECRET_KEY", "minioadmin"),
-		MinioUseSSL:         getEnvBool("MINIO_USE_SSL", false),
-		InternalCallbackURL: getEnv("INTERNAL_CALLBACK_URL", "http://panel:8000/api/v1/internal/processing/callback"),
-		InternalAPISecret:   getEnv("INTERNAL_API_SECRET", "internal-worker-secret-key-12345"),
-		Concurrency:         getEnvInt("CONCURRENCY", 2),
-		TempDir:             getEnv("TEMP_DIR", "/tmp/media"),
+		RabbitMQURL:           getEnv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/"),
+		RabbitMQQueue:         getEnv("RABBITMQ_QUEUE", "media.jobs"),
+		MinioEndpoint:         getEnv("MINIO_ENDPOINT", "minio:9000"),
+		MinioAccessKey:        getEnv("MINIO_ACCESS_KEY", "minioadmin"),
+		MinioSecretKey:        getEnv("MINIO_SECRET_KEY", "minioadmin"),
+		MinioUseSSL:           getEnvBool("MINIO_USE_SSL", false),
+		MinioProcessedBucket:  getEnv("MINIO_PROCESSED_BUCKET", "videos-processed"),
+		MinioThumbnailsBucket: getEnv("MINIO_THUMBNAILS_BUCKET", "thumbnails"),
+		InternalCallbackURL:   getEnv("INTERNAL_CALLBACK_URL", "http://panel:8000/api/v1/internal/processing/callback"),
+		InternalAPISecret:     getEnv("INTERNAL_API_SECRET", "internal-worker-secret-key-12345"),
+		Concurrency:           getEnvInt("CONCURRENCY", 2),
+		TempDir:               getEnv("TEMP_DIR", "/tmp/media"),
 	}
 
 	if val := os.Getenv("WORKER_CONCURRENCY"); val != "" {

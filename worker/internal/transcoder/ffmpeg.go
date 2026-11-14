@@ -27,7 +27,7 @@ func NewTranscoder(binPath string) *Transcoder {
 // TranscodeHLS performs a single-pass multi-variant HLS encode of sourcePath into outputDir.
 // It creates outputDir if it does not exist, builds the command arguments for the specified profiles,
 // and runs the FFmpeg process while capturing stderr diagnostics on failure.
-func (t *Transcoder) TranscodeHLS(ctx context.Context, sourcePath, outputDir string, profiles []Profile) error {
+func (t *Transcoder) TranscodeHLS(ctx context.Context, sourcePath, outputDir string, profiles []Profile, opts ...TranscodeOption) error {
 	if len(profiles) == 0 {
 		return errors.New("no profiles provided for transcoding")
 	}
@@ -42,7 +42,7 @@ func (t *Transcoder) TranscodeHLS(ctx context.Context, sourcePath, outputDir str
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	args := BuildFFmpegArgs(sourcePath, outputDir, profiles)
+	args := BuildFFmpegArgs(sourcePath, outputDir, profiles, opts...)
 
 	bin := t.binPath
 	if bin == "" {
