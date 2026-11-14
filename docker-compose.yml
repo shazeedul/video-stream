@@ -74,6 +74,8 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       INTERNAL_API_SECRET: "${INTERNAL_API_SECRET:-internal-worker-secret-key-12345}"
+      PHP_CLI_SERVER_WORKERS: 4
+      DEBUGBAR_ENABLED: "false"
     volumes:
       - ./panel:/var/www/html
     depends_on:
