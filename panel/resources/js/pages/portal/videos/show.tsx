@@ -1,4 +1,5 @@
 import DeleteConfirmationDialog from '@/components/delete-confirmation-dialog';
+import { VideoPlayer } from '@/components/player/video-player';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,6 +47,7 @@ import VideoStatusBadge from './partials/video-status-badge';
 
 interface VideoShowProps {
     readonly video: Video;
+    readonly playback_url?: string | null;
 }
 
 export function formatBytes(bytes: number | null | undefined): string {
@@ -57,7 +59,7 @@ export function formatBytes(bytes: number | null | undefined): string {
     return `${val} ${sizes[i]}`;
 }
 
-export default function VideoShow({ video }: VideoShowProps) {
+export default function VideoShow({ video, playback_url }: VideoShowProps) {
     const { __ } = useLocalizer();
     const page = usePage<SharedData>();
     const currentTenant = page.props.currentTenant;
@@ -398,7 +400,14 @@ export default function VideoShow({ video }: VideoShowProps) {
                         {/* Video Player / Thumbnail Preview Card */}
                         <Card className="overflow-hidden border-border/70 p-0 shadow-2xs">
                             <div className="relative aspect-video w-full bg-neutral-950">
-                                {video.thumbnail_path ? (
+                                {video.status === 'ready' && (playback_url || video.playback_url) ? (
+                                    <VideoPlayer
+                                        src={(playback_url || video.playback_url)!}
+                                        poster={video.thumbnail_path ?? undefined}
+                                        title={video.title}
+                                        className="size-full"
+                                    />
+                                ) : video.thumbnail_path ? (
                                     <img src={video.thumbnail_path} alt={video.title} className="size-full object-contain" />
                                 ) : (
                                     <div className="flex size-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-neutral-900 to-black text-neutral-400">
@@ -415,7 +424,7 @@ export default function VideoShow({ video }: VideoShowProps) {
                                     </div>
                                 )}
 
-                                {video.duration_seconds && (
+                                {!(video.status === 'ready' && (playback_url || video.playback_url)) && video.duration_seconds && (
                                     <div className="absolute right-3 bottom-3 rounded bg-black/85 px-2 py-0.5 font-mono text-xs font-semibold text-white backdrop-blur-xs">
                                         {formatDuration(video.duration_seconds)}
                                     </div>

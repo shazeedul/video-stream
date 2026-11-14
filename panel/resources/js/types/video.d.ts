@@ -50,6 +50,7 @@ export interface Video {
     status: VideoStatus;
     duration_seconds: number | null;
     thumbnail_path: string | null;
+    playback_url?: string | null;
     metadata?: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;

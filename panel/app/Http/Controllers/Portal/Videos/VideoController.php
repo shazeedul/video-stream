@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Portal\Videos;
 
+use App\Domain\Playback\Contracts\PlaybackTokenServiceInterface;
 use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
@@ -30,6 +31,7 @@ final class VideoController extends Controller
      */
     public function __construct(
         private readonly MultipartUploadServiceInterface $uploadService,
+        private readonly PlaybackTokenServiceInterface $playbackTokenService,
     ) {}
 
     /**
@@ -135,8 +137,17 @@ final class VideoController extends Controller
 
         $video->setRelation('latest_upload_session', $video->uploadSessions->first());
 
+        $playbackUrl = null;
+        if ($video->status === VideoStatus::READY) {
+            $playbackUrl = $this->playbackTokenService->getPlaybackUrl($video);
+            $video->setAttribute('playback_url', $playbackUrl);
+        } else {
+            $video->setAttribute('playback_url', null);
+        }
+
         return Inertia::render('portal/videos/show', [
             'video' => $video,
+            'playback_url' => $playbackUrl,
         ]);
     }
 
