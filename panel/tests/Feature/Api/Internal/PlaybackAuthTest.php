@@ -55,6 +55,37 @@ final class PlaybackAuthTest extends TestCase
         $response->assertHeader('X-Tenant-Id', $tenant->id);
     }
 
+    public function test_conflicting_video_id_header_and_query_param_returns_400_bad_request(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $videoA = Video::factory()->forTenant($tenant)->ready()->create();
+        $videoB = Video::factory()->forTenant($tenant)->ready()->create();
+
+        $expiresAt = time() + 3600;
+        $token = $this->tokenService->generateToken((string) $videoA->id, $expiresAt);
+
+        $response = $this->withHeaders(['X-Video-Id' => (string) $videoB->id])
+            ->get("/api/v1/internal/playback/auth?video_id={$videoA->id}&token={$token}&expires={$expiresAt}");
+
+        $response->assertStatus(400);
+        $this->assertSame('Conflicting video identifiers', $response->getContent());
+    }
+
+    public function test_matching_video_id_header_and_query_param_succeeds(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $video = Video::factory()->forTenant($tenant)->ready()->create();
+
+        $expiresAt = time() + 3600;
+        $token = $this->tokenService->generateToken((string) $video->id, $expiresAt);
+
+        $response = $this->withHeaders(['X-Video-Id' => (string) $video->id])
+            ->get("/api/v1/internal/playback/auth?video_id={$video->id}&token={$token}&expires={$expiresAt}");
+
+        $response->assertOk();
+        $response->assertHeader('X-Tenant-Id', $tenant->id);
+    }
+
     public function test_expired_token_returns_403_forbidden(): void
     {
         $tenant = Tenant::factory()->create();
