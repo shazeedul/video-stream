@@ -24,7 +24,7 @@ final class VideoAssetRegistrationService
         ?string $thumbnailKey = null,
         ?int $durationSeconds = null,
     ): Video {
-        return DB::transaction(function () use ($video, $assets, $thumbnailKey, $durationSeconds): Video {
+        $video = DB::transaction(function () use ($video, $assets, $thumbnailKey, $durationSeconds): Video {
             foreach ($assets as $asset) {
                 $type = AssetType::tryFrom((string) $asset['type']) ?? (string) $asset['type'];
 
@@ -54,9 +54,11 @@ final class VideoAssetRegistrationService
             $video->status = VideoStatus::READY;
             $video->save();
 
-            VideoStatusUpdated::dispatch($video);
-
             return $video;
         });
+
+        VideoStatusUpdated::dispatch($video);
+
+        return $video;
     }
 }
