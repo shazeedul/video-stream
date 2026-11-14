@@ -101,7 +101,7 @@ func NewClient(callbackURL, internalSecret string, opts ...ClientOption) *Client
 		callbackURL:    callbackURL,
 		internalSecret: internalSecret,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 30 * time.Second,
 		},
 		maxRetries:  3,
 		baseBackoff: 250 * time.Millisecond,

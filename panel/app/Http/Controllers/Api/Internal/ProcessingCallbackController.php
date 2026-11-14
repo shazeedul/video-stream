@@ -40,6 +40,9 @@ final class ProcessingCallbackController extends Controller
             }
         } elseif ($status === 'transcoding') {
             $video->status = VideoStatus::TRANSCODING;
+            if (isset($validated['duration_seconds'])) {
+                $video->duration_seconds = (int) $validated['duration_seconds'];
+            }
         } elseif ($status === 'packaging') {
             $video->status = VideoStatus::PACKAGING;
         } elseif ($status === 'ready') {

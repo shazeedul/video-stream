@@ -309,11 +309,12 @@ func (p *Pipeline) Process(ctx context.Context, job MediaJob) error {
 	}
 
 	if err := p.callback.SendStatus(ctx, callback.Payload{
-		JobID:        job.JobID,
-		VideoID:      job.VideoID,
-		Status:       callback.StatusReady,
-		ThumbnailKey: thumbnailKey,
-		Assets:       assetPayloads,
+		JobID:           job.JobID,
+		VideoID:         job.VideoID,
+		Status:          callback.StatusReady,
+		DurationSeconds: &dur,
+		ThumbnailKey:    thumbnailKey,
+		Assets:          assetPayloads,
 	}); err != nil {
 		var clientErr *callback.ClientError
 		if errors.As(err, &clientErr) && clientErr.IsNotFoundOrUnprocessable() {

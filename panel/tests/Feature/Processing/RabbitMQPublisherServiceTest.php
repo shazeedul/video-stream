@@ -28,17 +28,20 @@ final class RabbitMQPublisherServiceTest extends TestCase
         $channel = $connection->channel();
 
         try {
-            $channel->queue_purge('media.jobs');
+            $testQueue = 'media.test.'.bin2hex(random_bytes(4));
+            $testRoutingKey = 'media.test.'.bin2hex(random_bytes(4));
+            $channel->queue_declare($testQueue, false, false, true, true);
+            $channel->queue_bind($testQueue, 'media.direct', $testRoutingKey);
 
             $payload = [
                 'test_id' => '019324c3-e836-7db0-bd1b-c40c83a5316e',
                 'action' => 'test_publish',
             ];
 
-            $publisher->publish('media.direct', 'media.process', $payload);
+            $publisher->publish('media.direct', $testRoutingKey, $payload);
 
-            $message = $channel->basic_get('media.jobs');
-            $this->assertNotNull($message, 'Expected a message in media.jobs queue');
+            $message = $channel->basic_get($testQueue);
+            $this->assertNotNull($message, 'Expected a message in test queue');
 
             $decoded = json_decode($message->getBody(), true, 512, JSON_THROW_ON_ERROR);
             $this->assertSame($payload, $decoded);
