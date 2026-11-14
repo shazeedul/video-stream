@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import PortalLayout from '@/layouts/portal-layout';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes/portal';
@@ -24,8 +25,10 @@ import {
     Check,
     CheckCircle2,
     Clock,
+    Code,
     Copy,
     Edit3,
+    ExternalLink,
     EyeOff,
     FileText,
     Globe,
@@ -76,6 +79,28 @@ export default function VideoShow({ video, playback_url }: VideoShowProps) {
     // Delete Dialog State
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Embed Dialog State
+    const [isEmbedDialogOpen, setIsEmbedDialogOpen] = useState(false);
+    const [embedAutoplay, setEmbedAutoplay] = useState(false);
+    const [embedMuted, setEmbedMuted] = useState(false);
+    const [embedLoop, setEmbedLoop] = useState(false);
+
+    const handleAutoplayChange = (checked: boolean) => {
+        setEmbedAutoplay(checked);
+        if (checked && !embedMuted) {
+            setEmbedMuted(true);
+        }
+    };
+
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const embedQueryParams = new URLSearchParams();
+    if (embedAutoplay) embedQueryParams.set('autoplay', '1');
+    if (embedMuted) embedQueryParams.set('muted', '1');
+    if (embedLoop) embedQueryParams.set('loop', '1');
+    const embedQueryString = embedQueryParams.toString() ? `?${embedQueryParams.toString()}` : '';
+    const fullEmbedUrl = `${baseUrl}/embed/videos/${video.id}${embedQueryString}`;
+    const iframeSnippet = `<iframe src="${fullEmbedUrl}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
 
     // Permission helpers
     const isOwnerOrAdmin = currentTenant?.role === 'owner' || currentTenant?.role === 'admin';
@@ -363,6 +388,18 @@ export default function VideoShow({ video, playback_url }: VideoShowProps) {
                             <Copy className="size-3.5" />
                             <span>{__('Copy ID')}</span>
                         </Button>
+
+                        {video.status === 'ready' && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsEmbedDialogOpen(true)}
+                                className="inline-flex cursor-pointer items-center gap-1.5"
+                            >
+                                <Code className="size-3.5" />
+                                <span>{__('Embed')}</span>
+                            </Button>
+                        )}
 
                         {canEdit && (
                             <Button
@@ -723,6 +760,138 @@ export default function VideoShow({ video, playback_url }: VideoShowProps) {
                 loading={isDeleting}
                 onConfirm={handleDelete}
             />
+
+            {/* Embed Dialog */}
+            <Dialog open={isEmbedDialogOpen} onOpenChange={setIsEmbedDialogOpen}>
+                <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>{__('Embed Video')}</DialogTitle>
+                        <DialogDescription>
+                            {__('Generate responsive iframe code to embed this video into any webpage or application.')}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="mt-4 flex flex-col gap-5">
+                        {/* Playback Configuration Toggles */}
+                        <div className="grid grid-cols-1 gap-4 rounded-lg border border-border p-3 sm:grid-cols-3">
+                            <div className="flex items-center justify-between sm:flex-col sm:items-start sm:gap-2">
+                                <Label htmlFor="embed-autoplay" className="cursor-pointer text-sm font-medium">
+                                    {__('Autoplay')}
+                                </Label>
+                                <Switch
+                                    id="embed-autoplay"
+                                    checked={embedAutoplay}
+                                    onCheckedChange={handleAutoplayChange}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between sm:flex-col sm:items-start sm:gap-2">
+                                <Label htmlFor="embed-muted" className="cursor-pointer text-sm font-medium">
+                                    {__('Muted')}
+                                </Label>
+                                <Switch
+                                    id="embed-muted"
+                                    checked={embedMuted}
+                                    onCheckedChange={setEmbedMuted}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between sm:flex-col sm:items-start sm:gap-2">
+                                <Label htmlFor="embed-loop" className="cursor-pointer text-sm font-medium">
+                                    {__('Loop')}
+                                </Label>
+                                <Switch
+                                    id="embed-loop"
+                                    checked={embedLoop}
+                                    onCheckedChange={setEmbedLoop}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Embed Code Snippet */}
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="embed-snippet" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    {__('Embed Snippet')}
+                                </Label>
+                                <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(iframeSnippet, __('Embed code'))}
+                                    className="cursor-pointer text-xs font-medium text-primary hover:underline"
+                                >
+                                    {__('Copy Code')}
+                                </button>
+                            </div>
+                            <Textarea
+                                id="embed-snippet"
+                                readOnly
+                                value={iframeSnippet}
+                                rows={3}
+                                className="resize-none bg-muted/50 font-mono text-xs"
+                                onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                            />
+                        </div>
+
+                        {/* Direct URL */}
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="embed-url" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                {__('Direct Embed URL')}
+                            </Label>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    id="embed-url"
+                                    readOnly
+                                    value={fullEmbedUrl}
+                                    className="bg-muted/50 font-mono text-xs"
+                                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => copyToClipboard(fullEmbedUrl, __('Embed URL'))}
+                                    title={__('Copy URL')}
+                                    className="shrink-0"
+                                >
+                                    <Copy className="size-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            asChild
+                        >
+                            <a
+                                href={fullEmbedUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5"
+                            >
+                                <ExternalLink className="size-3.5" />
+                                <span>{__('Preview Link')}</span>
+                            </a>
+                        </Button>
+
+                        <div className="flex items-center gap-2">
+                            <Button type="button" variant="outline" onClick={() => setIsEmbedDialogOpen(false)}>
+                                {__('Close')}
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => copyToClipboard(iframeSnippet, __('Embed code'))}
+                                className="inline-flex cursor-pointer items-center gap-1.5"
+                            >
+                                <Copy className="size-3.5" />
+                                <span>{__('Copy Embed Code')}</span>
+                            </Button>
+                        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </PortalLayout>
     );
 }
