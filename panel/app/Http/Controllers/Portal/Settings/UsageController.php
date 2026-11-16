@@ -37,12 +37,13 @@ final class UsageController extends Controller
         $storageQuota = $this->tenantUsageService->getStorageQuotaBytes($tenant);
         $usagePercentage = $storageQuota > 0 ? round(($currentStorage / $storageQuota) * 100, 2) : 0.0;
 
-        $videoIds = Video::withoutGlobalScopes()
-            ->where('tenant_id', $tenant->id)
-            ->pluck('id');
-
         $breakdownRecords = VideoAsset::query()
-            ->whereIn('video_id', $videoIds)
+            ->whereIn(
+                'video_id',
+                Video::withoutGlobalScopes()
+                    ->where('tenant_id', $tenant->id)
+                    ->select('id')
+            )
             ->selectRaw('type, COALESCE(SUM(size_bytes), 0) as total_bytes, COUNT(*) as asset_count')
             ->groupBy('type')
             ->get();
