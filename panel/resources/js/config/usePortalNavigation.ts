@@ -1,4 +1,5 @@
 import { dashboard } from '@/routes/portal';
+import { usage as usageRoute } from '@/routes/portal/settings';
 import { overview as organizationOverview } from '@/routes/portal/settings/organization';
 import { index as organizationMembersIndex } from '@/routes/portal/settings/organization/members';
 import { edit as editPassword } from '@/routes/portal/settings/password';
@@ -7,7 +8,7 @@ import { deleteMethod as deleteProfile, edit as editProfile, overview as profile
 import { index as videosIndex } from '@/routes/portal/videos';
 import { type NavGroup, type NavItem } from '@/types';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
-import { Building2, Edit, LayoutGrid, Lock, Settings as SettingsIcon, Trash2, User as UserIcon, Users, Video } from 'lucide-react';
+import { Building2, Edit, HardDrive, LayoutGrid, Lock, Settings as SettingsIcon, Trash2, User as UserIcon, Users, Video } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function usePortalMainNavigation() {
@@ -103,6 +104,12 @@ export function useSettingsNavigation(): NavItem[] {
                         href: organizationMembersIndex(),
                         icon: Users,
                         active_when: organizationMembersIndex().url + '*',
+                    },
+                    {
+                        title: __('Usage'),
+                        href: usageRoute(),
+                        icon: HardDrive,
+                        active_when: usageRoute().url,
                     },
                 ],
             },

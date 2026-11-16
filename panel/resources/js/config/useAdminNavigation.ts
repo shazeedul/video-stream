@@ -1,4 +1,5 @@
 import { dashboard } from '@/routes/admin';
+import { index as monitoringIndex } from '@/routes/admin/monitoring';
 import { index as rolesIndex } from '@/routes/admin/roles';
 import { edit as editPassword } from '@/routes/admin/settings/password';
 import { index as preferencesIndex } from '@/routes/admin/settings/preferences';
@@ -9,7 +10,7 @@ import { index as usersIndex } from '@/routes/admin/users';
 import { index as videosIndex } from '@/routes/admin/videos';
 import { type NavGroup, type NavItem } from '@/types';
 import { useLocalizer } from '@devwizard/laravel-localizer-react';
-import { Building2, Cog, Edit, Film, LayoutGrid, Lock, Settings, Settings as SettingsIcon, Shield, Trash2, User as UserIcon, Users } from 'lucide-react';
+import { Activity, Building2, Cog, Edit, Film, LayoutGrid, Lock, Settings, Settings as SettingsIcon, Shield, Trash2, User as UserIcon, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
 export function useAdminMainNavigation() {
@@ -64,6 +65,13 @@ export function useAdminMainNavigation() {
                                 icon: Users,
                                 permission: 'users.view',
                                 active_when: usersIndex().url + '*',
+                            },
+                            {
+                                title: __('Monitoring'),
+                                href: monitoringIndex(),
+                                icon: Activity,
+                                permission: 'system-settings.view',
+                                active_when: monitoringIndex().url + '*',
                             },
                             {
                                 title: __('Settings'),

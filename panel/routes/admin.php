@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GlobalSearchController;
+use App\Http\Controllers\Admin\MonitoringController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\Settings\PasswordController;
@@ -103,6 +104,13 @@ Route::prefix('panel/admin')
             Route::post('{systemSetting}/move-up', [SystemSettingController::class, 'moveUp'])->middleware('permission:system-settings.update')->name('move-up');
             Route::post('{systemSetting}/move-down', [SystemSettingController::class, 'moveDown'])->middleware('permission:system-settings.update')->name('move-down');
         });
+
+        /*
+         * System monitoring routes
+         */
+        Route::get('monitoring', [MonitoringController::class, 'index'])
+            ->middleware('permission:system-settings.view')
+            ->name('monitoring.index');
 
         /*
          * Settings routes
