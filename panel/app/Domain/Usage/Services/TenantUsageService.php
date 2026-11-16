@@ -102,7 +102,11 @@ final class TenantUsageService implements TenantUsageServiceInterface
         }
 
         $date = now()->toDateString();
-        Redis::incr("tenant:{$tenantId}:views:{$date}");
+        $key = "tenant:{$tenantId}:views:{$date}";
+        $newVal = Redis::incr($key);
+        if ($newVal === 1) {
+            Redis::expire($key, 86400 * 14); // 14-day retention in Redis
+        }
 
         return true;
     }
@@ -117,7 +121,11 @@ final class TenantUsageService implements TenantUsageServiceInterface
         }
 
         $date = now()->toDateString();
-        Redis::incrby("tenant:{$tenantId}:egress:{$date}", $bytes);
+        $key = "tenant:{$tenantId}:egress:{$date}";
+        $newVal = Redis::incrby($key, $bytes);
+        if ($newVal === $bytes) {
+            Redis::expire($key, 86400 * 14); // 14-day retention in Redis
+        }
     }
 
     /**
@@ -126,34 +134,35 @@ final class TenantUsageService implements TenantUsageServiceInterface
     public function aggregateHourlyUsage(?string $date = null): int
     {
         $targetDate = $date ?? now()->toDateString();
-        $activeTenants = Tenant::query()->active()->get();
         $processed = 0;
 
-        foreach ($activeTenants as $tenant) {
-            $redisViews = Redis::get("tenant:{$tenant->id}:views:{$targetDate}");
-            $redisEgress = Redis::get("tenant:{$tenant->id}:egress:{$targetDate}");
+        Tenant::query()->active()->chunk(100, function ($activeTenants) use ($targetDate, &$processed): void {
+            foreach ($activeTenants as $tenant) {
+                $redisViews = Redis::get("tenant:{$tenant->id}:views:{$targetDate}");
+                $redisEgress = Redis::get("tenant:{$tenant->id}:egress:{$targetDate}");
 
-            $views = ($redisViews !== null && $redisViews !== false) ? (int) $redisViews : 0;
-            $egress = ($redisEgress !== null && $redisEgress !== false) ? (int) $redisEgress : 0;
+                $views = ($redisViews !== null && $redisViews !== false) ? (int) $redisViews : 0;
+                $egress = ($redisEgress !== null && $redisEgress !== false) ? (int) $redisEgress : 0;
 
-            $storageBytes = $this->getCurrentStorageBytes($tenant);
-            $videoCount = Video::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count();
+                $storageBytes = $this->getCurrentStorageBytes($tenant);
+                $videoCount = Video::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count();
 
-            TenantUsageRecord::withoutGlobalScopes()->updateOrCreate(
-                [
-                    'tenant_id' => $tenant->id,
-                    'date' => $targetDate,
-                ],
-                [
-                    'storage_bytes' => $storageBytes,
-                    'egress_bytes' => $egress,
-                    'view_count' => $views,
-                    'video_count' => $videoCount,
-                ]
-            );
+                TenantUsageRecord::withoutGlobalScopes()->updateOrCreate(
+                    [
+                        'tenant_id' => $tenant->id,
+                        'date' => $targetDate,
+                    ],
+                    [
+                        'storage_bytes' => $storageBytes,
+                        'egress_bytes' => $egress,
+                        'view_count' => $views,
+                        'video_count' => $videoCount,
+                    ]
+                );
 
-            $processed++;
-        }
+                $processed++;
+            }
+        });
 
         return $processed;
     }
