@@ -25,7 +25,7 @@ it('denies search access for unauthorized users', function () {
     $user = portalUser();
 
     actingAs($user)
-        ->getJson(route('admin.search.index', ['q' => 'test']))
+        ->get(route('admin.search.index', ['q' => 'test']))
         // Portal users are redirected by admin.panel middleware
         ->assertRedirect();
 });
