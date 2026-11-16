@@ -8,6 +8,7 @@ use App\Http\Controllers\Portal\Settings\OrganizationController;
 use App\Http\Controllers\Portal\Settings\OrganizationMemberController;
 use App\Http\Controllers\Portal\Settings\PasswordController;
 use App\Http\Controllers\Portal\Settings\ProfileController;
+use App\Http\Controllers\Portal\Settings\UsageController;
 use App\Http\Controllers\Portal\Settings\UserPreferencesController;
 use App\Http\Controllers\Portal\TenantSwitchController;
 use App\Http\Controllers\Portal\Videos\VideoController;
@@ -71,6 +72,9 @@ Route::prefix('panel')
             // Organization routes
             Route::get('organization', [OrganizationController::class, 'overview'])->name('organization.overview');
             Route::put('organization', [OrganizationController::class, 'update'])->name('organization.update');
+
+            // Organization usage routes
+            Route::get('usage', [UsageController::class, 'index'])->name('usage');
 
             // Organization member routes
             Route::prefix('organization/members')->name('organization.members.')->group(function (): void {
