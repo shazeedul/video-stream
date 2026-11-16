@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -135,7 +136,10 @@ func (hp *HeartbeatPublisher) Send(ctx context.Context, status string) error {
 	if err != nil {
 		return fmt.Errorf("heartbeat HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("heartbeat HTTP request returned status %d", resp.StatusCode)
@@ -153,7 +157,7 @@ func (hp *HeartbeatPublisher) Start(ctx context.Context) {
 	)
 
 	// Send initial active heartbeat immediately
-	initCtx, initCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	initCtx, initCancel := context.WithTimeout(ctx, 5*time.Second)
 	if err := hp.Send(initCtx, "active"); err != nil {
 		hp.logger.Warn("initial heartbeat failed", "error", err, "worker_id", hp.workerID)
 	}
@@ -173,7 +177,7 @@ func (hp *HeartbeatPublisher) Start(ctx context.Context) {
 			stopCancel()
 			return
 		case <-ticker.C:
-			tickCtx, tickCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			tickCtx, tickCancel := context.WithTimeout(ctx, 5*time.Second)
 			if err := hp.Send(tickCtx, "active"); err != nil {
 				hp.logger.Warn("periodic heartbeat failed", "error", err, "worker_id", hp.workerID)
 			}
