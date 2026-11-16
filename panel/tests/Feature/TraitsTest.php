@@ -15,7 +15,7 @@ it('updates and deletes profile photos', function () {
     $user = User::factory()->create(['profile_photo_path' => 'profile-photos/old.jpg']);
     Storage::disk('public')->put('profile-photos/old.jpg', 'old');
 
-    $file = UploadedFile::fake()->image('avatar.jpg');
+    $file = UploadedFile::fake()->create('avatar.jpg', 100, 'image/jpeg');
     $user->updateProfilePhoto($file);
 
     expect($user->profile_photo_path)->not->toBeNull();

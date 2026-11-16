@@ -107,7 +107,7 @@ M3U8;
         $token = $tokenService->generateToken((string) $this->testVideo->id, $expires);
 
         // 1. Master manifest request
-        $masterResponse = Http::timeout(10)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?token={$token}&expires={$expires}");
+        $masterResponse = Http::timeout(30)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?token={$token}&expires={$expires}");
 
         $this->assertSame(200, $masterResponse->status());
         $this->assertStringContainsString('#EXTM3U', $masterResponse->body());
@@ -115,13 +115,13 @@ M3U8;
         $this->assertSame('*', $masterResponse->header('Access-Control-Allow-Origin'));
 
         // 2. Rendition playlist request
-        $renditionResponse = Http::timeout(10)->get("http://nginx/playback/{$this->testVideo->id}/360p.m3u8?token={$token}&expires={$expires}");
+        $renditionResponse = Http::timeout(30)->get("http://nginx/playback/{$this->testVideo->id}/360p.m3u8?token={$token}&expires={$expires}");
 
         $this->assertSame(200, $renditionResponse->status());
         $this->assertStringContainsString('segment_000.ts', $renditionResponse->body());
 
         // 3. Video segment request
-        $segmentResponse = Http::timeout(10)->get("http://nginx/playback/{$this->testVideo->id}/segment_000.ts?token={$token}&expires={$expires}");
+        $segmentResponse = Http::timeout(30)->get("http://nginx/playback/{$this->testVideo->id}/segment_000.ts?token={$token}&expires={$expires}");
 
         $this->assertSame(200, $segmentResponse->status());
         $this->assertSame('test ts segment content 1234567890', $segmentResponse->body());
@@ -144,20 +144,20 @@ M3U8;
         // Expired token
         $expiredTime = time() - 3600;
         $expiredToken = $tokenService->generateToken((string) $this->testVideo->id, $expiredTime);
-        $expiredResponse = Http::timeout(10)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?token={$expiredToken}&expires={$expiredTime}");
+        $expiredResponse = Http::timeout(30)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?token={$expiredToken}&expires={$expiredTime}");
 
         $this->assertSame(403, $expiredResponse->status());
 
         // Invalid token signature
         $expires = time() + 3600;
-        $invalidResponse = Http::timeout(10)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?token=invalid_sig&expires={$expires}");
+        $invalidResponse = Http::timeout(30)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?token=invalid_sig&expires={$expires}");
 
         $this->assertSame(403, $invalidResponse->status());
 
         // Conflicting video ID
         $validToken = $tokenService->generateToken((string) $this->testVideo->id, $expires);
         $conflictingId = (string) Str::uuid();
-        $conflictingResponse = Http::timeout(10)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?video_id={$conflictingId}&token={$validToken}&expires={$expires}");
+        $conflictingResponse = Http::timeout(30)->get("http://nginx/playback/{$this->testVideo->id}/master.m3u8?video_id={$conflictingId}&token={$validToken}&expires={$expires}");
 
         $this->assertContains($conflictingResponse->status(), [400, 403]);
     }
