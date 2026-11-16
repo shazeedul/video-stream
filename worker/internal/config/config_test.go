@@ -40,6 +40,7 @@ func TestLoadConfig_AllDefaults(t *testing.T) {
 		"MINIO_PROCESSED_BUCKET",
 		"MINIO_THUMBNAILS_BUCKET",
 		"INTERNAL_CALLBACK_URL",
+		"INTERNAL_HEARTBEAT_URL",
 		"INTERNAL_API_SECRET",
 		"CONCURRENCY",
 		"WORKER_CONCURRENCY",
@@ -86,6 +87,9 @@ func TestLoadConfig_AllDefaults(t *testing.T) {
 	if cfg.InternalCallbackURL != "http://panel:8000/api/v1/internal/processing/callback" {
 		t.Errorf("unexpected default InternalCallbackURL: %s", cfg.InternalCallbackURL)
 	}
+	if cfg.InternalHeartbeatURL != "http://panel:8000/api/v1/internal/worker/heartbeat" {
+		t.Errorf("unexpected default InternalHeartbeatURL: %s", cfg.InternalHeartbeatURL)
+	}
 	if cfg.InternalAPISecret != "internal-worker-secret-key-12345" {
 		t.Errorf("unexpected default InternalAPISecret: %s", cfg.InternalAPISecret)
 	}
@@ -106,6 +110,7 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 	os.Setenv("MINIO_PROCESSED_BUCKET", "custom-processed")
 	os.Setenv("MINIO_THUMBNAILS_BUCKET", "custom-thumbs")
 	os.Setenv("INTERNAL_CALLBACK_URL", "https://api.example.com/callback")
+	os.Setenv("INTERNAL_HEARTBEAT_URL", "https://api.example.com/heartbeat")
 	os.Setenv("WORKER_CONCURRENCY", "8")
 	os.Setenv("WORKER_TEMP_DIR", "/custom/tmp")
 
@@ -118,6 +123,7 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 		os.Unsetenv("MINIO_PROCESSED_BUCKET")
 		os.Unsetenv("MINIO_THUMBNAILS_BUCKET")
 		os.Unsetenv("INTERNAL_CALLBACK_URL")
+		os.Unsetenv("INTERNAL_HEARTBEAT_URL")
 		os.Unsetenv("WORKER_CONCURRENCY")
 		os.Unsetenv("WORKER_TEMP_DIR")
 	}()
@@ -150,6 +156,9 @@ func TestLoadConfig_CustomValues(t *testing.T) {
 	}
 	if cfg.InternalCallbackURL != "https://api.example.com/callback" {
 		t.Errorf("unexpected InternalCallbackURL: %s", cfg.InternalCallbackURL)
+	}
+	if cfg.InternalHeartbeatURL != "https://api.example.com/heartbeat" {
+		t.Errorf("unexpected InternalHeartbeatURL: %s", cfg.InternalHeartbeatURL)
 	}
 	if cfg.Concurrency != 8 {
 		t.Errorf("unexpected Concurrency: %d", cfg.Concurrency)

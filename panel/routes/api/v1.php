@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\Internal\PlaybackAuthController;
 use App\Http\Controllers\Api\Internal\ProcessingCallbackController;
+use App\Http\Controllers\Api\Internal\WorkerHeartbeatController;
 use App\Http\Middleware\VerifyInternalSecret;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         Route::middleware(VerifyInternalSecret::class)->group(function (): void {
             Route::post('/processing/callback', ProcessingCallbackController::class)->name('internal.processing.callback');
+            Route::post('/worker/heartbeat', WorkerHeartbeatController::class)->name('internal.worker.heartbeat');
         });
     });
 });

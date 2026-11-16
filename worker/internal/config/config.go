@@ -17,6 +17,7 @@ type Config struct {
 	MinioProcessedBucket  string
 	MinioThumbnailsBucket string
 	InternalCallbackURL   string
+	InternalHeartbeatURL  string
 	InternalAPISecret     string
 	Concurrency           int
 	TempDir               string
@@ -34,6 +35,7 @@ func Load() (*Config, error) {
 		MinioProcessedBucket:  getEnv("MINIO_PROCESSED_BUCKET", "videos-processed"),
 		MinioThumbnailsBucket: getEnv("MINIO_THUMBNAILS_BUCKET", "thumbnails"),
 		InternalCallbackURL:   getEnv("INTERNAL_CALLBACK_URL", "http://panel:8000/api/v1/internal/processing/callback"),
+		InternalHeartbeatURL:  getEnv("INTERNAL_HEARTBEAT_URL", "http://panel:8000/api/v1/internal/worker/heartbeat"),
 		InternalAPISecret:     getEnv("INTERNAL_API_SECRET", "internal-worker-secret-key-12345"),
 		Concurrency:           getEnvInt("CONCURRENCY", 2),
 		TempDir:               getEnv("TEMP_DIR", "/tmp/media"),
