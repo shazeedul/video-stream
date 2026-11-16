@@ -29,7 +29,7 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
     docker compose -f "${REPO_ROOT}/docker-compose.yml" exec -T "${COMPOSE_SERVICE}" \
         pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" | gzip > "${BACKUP_FILE}"
 elif docker ps --format '{{.Names}}' | grep -q "^wiz_postgres$"; then
-    docker exec -t wiz_postgres \
+    docker exec -i wiz_postgres \
         pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" | gzip > "${BACKUP_FILE}"
 else
     echo "ERROR: Unable to locate docker compose or running wiz_postgres container." >&2
