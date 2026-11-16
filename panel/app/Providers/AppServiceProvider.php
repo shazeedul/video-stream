@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Monitoring\Contracts\HealthCheckServiceInterface;
+use App\Domain\Monitoring\Services\HealthCheckService;
 use App\Domain\Playback\Contracts\PlaybackTokenServiceInterface;
 use App\Domain\Playback\Services\PlaybackTokenService;
 use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
@@ -41,6 +43,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(RabbitMQPublisherInterface::class, RabbitMQPublisherService::class);
         $this->app->singleton(PlaybackTokenServiceInterface::class, PlaybackTokenService::class);
         $this->app->bind(TenantUsageServiceInterface::class, TenantUsageService::class);
+        $this->app->bind(HealthCheckServiceInterface::class, HealthCheckService::class);
     }
 
     /**

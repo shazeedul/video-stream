@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 #[\Illuminate\Database\Eloquent\Attributes\Appends(['profile_photo_url', 'has_password'])]
@@ -49,6 +50,7 @@ use Spatie\Permission\Traits\HasRoles;
 ])]
 final class User extends Authenticatable
 {
+    use HasApiTokens;
     use HasFactory;
     use HasProfilePhoto;
     use HasRoles;
