@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"wiz-media-worker/internal/callback"
@@ -36,6 +37,7 @@ func main() {
 		"processed_bucket", cfg.MinioProcessedBucket,
 		"thumbnails_bucket", cfg.MinioThumbnailsBucket,
 		"callback_url", cfg.InternalCallbackURL,
+		"heartbeat_url", cfg.InternalHeartbeatURL,
 	)
 
 	// Initialize MinIO storage client
@@ -76,11 +78,26 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Initialize and launch heartbeat publisher in background goroutine
+	heartbeatPub := observability.NewHeartbeatPublisher(
+		cfg.InternalHeartbeatURL,
+		cfg.InternalAPISecret,
+		logger,
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		heartbeatPub.Start(ctx)
+	}()
+
 	logger.Info("worker initialized, starting queue consumer...")
 	if err := mediaConsumer.Start(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error("worker consumer stopped with error", "error", err)
 		os.Exit(1)
 	}
 
+	wg.Wait()
 	logger.Info("wiz-media-worker terminated gracefully")
 }
