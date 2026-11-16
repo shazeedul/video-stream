@@ -8,7 +8,9 @@ use App\Domain\Tenants\Contracts\TenantContextServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Uploads\Models\UploadSession;
+use App\Domain\Usage\Contracts\TenantUsageServiceInterface;
 use App\Domain\Videos\Models\Video;
+use App\Enums\UploadSessionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Portal\Videos\CompleteUploadRequest;
 use App\Http\Requests\Portal\Videos\GetPartUrlsRequest;
@@ -26,6 +28,7 @@ final class VideoUploadController extends Controller
      */
     public function __construct(
         private readonly MultipartUploadServiceInterface $uploadService,
+        private readonly TenantUsageServiceInterface $usageService,
     ) {}
 
     /**
@@ -35,6 +38,15 @@ final class VideoUploadController extends Controller
     {
         $this->ensureTenantAccess($video, $request->user());
         $this->authorize('update', $video);
+
+        $fileSize = (int) $request->validated('file_size');
+        $tenant = $video->tenant ?? ($video->tenant_id !== null ? Tenant::find($video->tenant_id) : null);
+
+        if ($tenant !== null && $this->usageService->hasExceededStorageQuota($tenant, $fileSize)) {
+            return response()->json([
+                'message' => 'Tenant storage quota exceeded. Please upgrade your plan or remove existing media.',
+            ], 422);
+        }
 
         $session = $this->uploadService->initiateUpload(
             $video,
@@ -137,6 +149,10 @@ final class VideoUploadController extends Controller
 
         try {
             $this->uploadService->abortUpload($session);
+
+            if ($session->fresh()?->status !== UploadSessionStatus::ABORTED) {
+                $session->update(['status' => UploadSessionStatus::ABORTED]);
+            }
 
             return response()->json([
                 'message' => __('Upload aborted successfully.'),
