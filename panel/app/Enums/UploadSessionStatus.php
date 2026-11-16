@@ -12,6 +12,7 @@ enum UploadSessionStatus: string implements HasLabels
     use EnumHelpers;
 
     case PENDING = 'pending';
+    case UPLOADING = 'uploading';
     case COMPLETED = 'completed';
     case ABORTED = 'aborted';
     case EXPIRED = 'expired';
@@ -20,6 +21,7 @@ enum UploadSessionStatus: string implements HasLabels
     {
         return match ($this) {
             self::PENDING => __('Pending'),
+            self::UPLOADING => __('Uploading'),
             self::COMPLETED => __('Completed'),
             self::ABORTED => __('Aborted'),
             self::EXPIRED => __('Expired'),
@@ -30,6 +32,7 @@ enum UploadSessionStatus: string implements HasLabels
     {
         return match ($this) {
             self::PENDING => 'amber',
+            self::UPLOADING => 'blue',
             self::COMPLETED => 'green',
             self::ABORTED => 'red',
             self::EXPIRED => 'gray',
@@ -39,6 +42,11 @@ enum UploadSessionStatus: string implements HasLabels
     public function isPending(): bool
     {
         return $this === self::PENDING;
+    }
+
+    public function isUploading(): bool
+    {
+        return $this === self::UPLOADING;
     }
 
     public function isCompleted(): bool

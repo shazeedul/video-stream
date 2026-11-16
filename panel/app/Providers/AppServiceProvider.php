@@ -13,6 +13,8 @@ use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Tenants\Services\TenantContextService;
 use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Uploads\Services\MinioMultipartUploadService;
+use App\Domain\Usage\Contracts\TenantUsageServiceInterface;
+use App\Domain\Usage\Services\TenantUsageService;
 use App\Domain\Videos\Models\Video;
 use App\Policies\TenantPolicy;
 use App\Policies\VideoPolicy;
@@ -38,6 +40,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(MultipartUploadServiceInterface::class, MinioMultipartUploadService::class);
         $this->app->bind(RabbitMQPublisherInterface::class, RabbitMQPublisherService::class);
         $this->app->singleton(PlaybackTokenServiceInterface::class, PlaybackTokenService::class);
+        $this->app->bind(TenantUsageServiceInterface::class, TenantUsageService::class);
     }
 
     /**

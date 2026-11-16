@@ -65,7 +65,7 @@ final class UploadSession extends Model
      */
     public function canAcceptParts(): bool
     {
-        return $this->status === UploadSessionStatus::PENDING && ! $this->isExpired();
+        return in_array($this->status, [UploadSessionStatus::PENDING, UploadSessionStatus::UPLOADING], true) && ! $this->isExpired();
     }
 
     /**

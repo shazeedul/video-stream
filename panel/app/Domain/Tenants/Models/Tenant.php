@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Tenants\Models;
 
 use App\Domain\Uploads\Models\UploadSession;
+use App\Domain\Usage\Models\TenantUsageRecord;
 use App\Domain\Videos\Models\Video;
 use App\Enums\TenantStatus;
 use App\Models\User;
@@ -70,6 +71,25 @@ final class Tenant extends Model
     public function uploadSessions(): HasMany
     {
         return $this->hasMany(UploadSession::class, 'tenant_id');
+    }
+
+    /**
+     * Usage records belonging to this tenant.
+     */
+    public function usageRecords(): HasMany
+    {
+        return $this->hasMany(TenantUsageRecord::class, 'tenant_id');
+    }
+
+    /**
+     * Get configured storage quota in bytes, defaulting to 10 GB.
+     */
+    public function getStorageQuotaBytes(): int
+    {
+        /** @var array<string, mixed> $settings */
+        $settings = $this->settings ?? [];
+
+        return (int) ($settings['storage_quota_bytes'] ?? 10 * 1024 * 1024 * 1024);
     }
 
     /**
