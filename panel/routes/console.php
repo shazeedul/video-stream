@@ -14,3 +14,8 @@ Artisan::command('inspire', function (): void {
 Schedule::command('cleanup:users')
     ->daily()
     ->description('Delete users that have passed their scheduled deletion date');
+
+// Schedule hourly aggregation of playback bandwidth and views from Redis to database
+Schedule::command('usage:aggregate-bandwidth')
+    ->hourly()
+    ->description('Aggregate Redis playback egress and views into daily tenant usage records');

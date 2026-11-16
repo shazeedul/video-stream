@@ -15,4 +15,10 @@ interface TenantUsageServiceInterface
     public function hasExceededStorageQuota(Tenant $tenant, int $additionalBytes = 0): bool;
 
     public function recalculateTenantStorage(Tenant $tenant): int;
+
+    public function recordPlaybackView(string $tenantId, string $videoId, string $clientIdentifier): bool;
+
+    public function recordPlaybackEgress(string $tenantId, int $bytes): void;
+
+    public function aggregateHourlyUsage(?string $date = null): int;
 }
