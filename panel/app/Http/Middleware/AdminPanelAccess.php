@@ -24,6 +24,10 @@ final class AdminPanelAccess
 
         // If user doesn't have admin panel access, redirect to user panel
         if (! $user->can('admin.panel.view')) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                abort(403, 'Unauthorized.');
+            }
+
             return to_route('portal.dashboard');
         }
 
