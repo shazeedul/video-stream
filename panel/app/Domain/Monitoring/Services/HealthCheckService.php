@@ -7,6 +7,7 @@ namespace App\Domain\Monitoring\Services;
 use App\Domain\Monitoring\Contracts\HealthCheckServiceInterface;
 use App\Domain\Monitoring\DataTransferObjects\HealthReport;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
@@ -44,13 +45,41 @@ final class HealthCheckService implements HealthCheckServiceInterface
             ];
         }
 
-        $rabbitCheck = $this->checkRabbitMQ();
-        $workersCheck = $this->checkWorkers();
-        $minioCheck = $this->checkMinio();
+        try {
+            $auxiliary = Cache::remember('health:liveness:auxiliary', 10, function (): array {
+                $rabbitCheck = $this->checkRabbitMQ();
+                $workersCheck = $this->checkWorkers();
+                $minioCheck = $this->checkMinio();
 
-        $rabbitOk = ($rabbitCheck['status'] === 'ok');
-        $workersOk = ($workersCheck['status'] === 'ok');
-        $minioOk = ($minioCheck['status'] === 'ok');
+                return [
+                    'rabbit' => ($rabbitCheck['status'] === 'ok'),
+                    'workers' => ($workersCheck['status'] === 'ok'),
+                    'minio' => ($minioCheck['status'] === 'ok'),
+                ];
+            });
+        } catch (Throwable) {
+            try {
+                $rabbitCheck = $this->checkRabbitMQ();
+                $workersCheck = $this->checkWorkers();
+                $minioCheck = $this->checkMinio();
+
+                $auxiliary = [
+                    'rabbit' => ($rabbitCheck['status'] === 'ok'),
+                    'workers' => ($workersCheck['status'] === 'ok'),
+                    'minio' => ($minioCheck['status'] === 'ok'),
+                ];
+            } catch (Throwable) {
+                $auxiliary = [
+                    'rabbit' => true,
+                    'workers' => true,
+                    'minio' => true,
+                ];
+            }
+        }
+
+        $rabbitOk = (bool) ($auxiliary['rabbit'] ?? true);
+        $workersOk = (bool) ($auxiliary['workers'] ?? true);
+        $minioOk = (bool) ($auxiliary['minio'] ?? true);
 
         if (! $rabbitOk || ! $workersOk || ! $minioOk) {
             return [

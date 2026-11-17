@@ -11,6 +11,7 @@ use App\Domain\Usage\Models\TenantUsageRecord;
 use App\Domain\Videos\Models\Video;
 use App\Domain\Videos\Models\VideoAsset;
 use App\Enums\UploadSessionStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Redis;
 
 final class TenantUsageService implements TenantUsageServiceInterface
@@ -39,6 +40,7 @@ final class TenantUsageService implements TenantUsageServiceInterface
                 'PENDING',
                 'UPLOADING',
             ])
+            ->where(fn (Builder $q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
             ->selectRaw('COALESCE(SUM(part_size * total_parts), 0) as total')
             ->value('total');
 
@@ -141,8 +143,21 @@ final class TenantUsageService implements TenantUsageServiceInterface
                 $redisViews = Redis::get("tenant:{$tenant->id}:views:{$targetDate}");
                 $redisEgress = Redis::get("tenant:{$tenant->id}:egress:{$targetDate}");
 
-                $views = ($redisViews !== null && $redisViews !== false) ? (int) $redisViews : 0;
-                $egress = ($redisEgress !== null && $redisEgress !== false) ? (int) $redisEgress : 0;
+                $existingRecord = TenantUsageRecord::withoutGlobalScopes()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('date', $targetDate)
+                    ->first();
+
+                $hasRedisViews = ($redisViews !== null && $redisViews !== false);
+                $hasRedisEgress = ($redisEgress !== null && $redisEgress !== false);
+
+                $views = $hasRedisViews
+                    ? (int) $redisViews
+                    : ($existingRecord !== null ? (int) $existingRecord->view_count : 0);
+
+                $egress = $hasRedisEgress
+                    ? (int) $redisEgress
+                    : ($existingRecord !== null ? (int) $existingRecord->egress_bytes : 0);
 
                 $storageBytes = $this->getCurrentStorageBytes($tenant);
                 $videoCount = Video::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count();

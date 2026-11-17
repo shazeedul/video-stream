@@ -8,6 +8,8 @@ use App\Domain\Tenants\Models\Tenant;
 
 interface TenantUsageServiceInterface
 {
+    public const int DEFAULT_SEGMENT_ESTIMATE_BYTES = 1_572_864;
+
     public function getCurrentStorageBytes(Tenant $tenant): int;
 
     public function getStorageQuotaBytes(Tenant $tenant): int;

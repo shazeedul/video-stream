@@ -184,3 +184,32 @@ test('worker registry prunes expired workers and reports active count', function
         ->and($report->components['workers']['active_count'])->toBe(1)
         ->and($report->components['workers']['instances'][0]['id'])->toBe('active-worker');
 });
+
+test('shallow liveness caches auxiliary checks and falls back safely if cache throws', function (): void {
+    Redis::sadd('workers:active', 'worker-test-1');
+    Redis::setex('worker:heartbeat:worker-test-1', 45, (string) json_encode([
+        'id' => 'worker-test-1',
+        'hostname' => 'worker-node-1',
+        'timestamp' => time(),
+    ], JSON_THROW_ON_ERROR));
+
+    // First call populates cache
+    $response = $this->get('/health');
+    $response->assertOk();
+
+    expect(Illuminate\Support\Facades\Cache::has('health:liveness:auxiliary'))->toBeTrue();
+
+    // Verify cache fallback when Cache facade throws an exception
+    Illuminate\Support\Facades\Cache::shouldReceive('remember')
+        ->once()
+        ->with('health:liveness:auxiliary', 10, Mockery::any())
+        ->andThrow(new RuntimeException('Cache cluster down'));
+
+    $service = app(HealthCheckServiceInterface::class);
+    $liveness = $service->checkLiveness();
+
+    // DB and Redis are ok, so liveness must not fail
+    expect($liveness['status'])->toBeIn(['ok', 'degraded'])
+        ->and($liveness['database'])->toBe('ok')
+        ->and($liveness['redis'])->toBe('ok');
+});
