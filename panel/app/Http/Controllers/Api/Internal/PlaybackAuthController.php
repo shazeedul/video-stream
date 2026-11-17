@@ -12,6 +12,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 final class PlaybackAuthController extends Controller
 {
@@ -48,7 +50,11 @@ final class PlaybackAuthController extends Controller
         $expires = $request->query('expires') !== null ? (int) $request->query('expires') : null;
 
         if ($token !== null && $expires !== null && $playbackTokenService->validateToken((string) $video->id, (string) $token, $expires)) {
-            $this->recordUsage($usageService, $video, $originalUri, is_string($token) ? $token : null, $request);
+            try {
+                $this->recordUsage($usageService, $video, $originalUri, is_string($token) ? $token : null, $request);
+            } catch (Throwable $e) {
+                Log::warning('Playback usage metering failed: '.$e->getMessage());
+            }
 
             return response('', 200)->header('X-Tenant-Id', (string) $video->tenant_id);
         }
@@ -57,7 +63,11 @@ final class PlaybackAuthController extends Controller
         $user = $request->user() ?? auth('sanctum')->user();
 
         if ($user instanceof User && $video->tenant !== null && $user->isTenantMember($video->tenant)) {
-            $this->recordUsage($usageService, $video, $originalUri, is_string($token) ? $token : null, $request);
+            try {
+                $this->recordUsage($usageService, $video, $originalUri, is_string($token) ? $token : null, $request);
+            } catch (Throwable $e) {
+                Log::warning('Playback usage metering failed: '.$e->getMessage());
+            }
 
             return response('', 200)->header('X-Tenant-Id', (string) $video->tenant_id);
         }
@@ -75,17 +85,24 @@ final class PlaybackAuthController extends Controller
         ?string $token,
         Request $request,
     ): void {
-        if ($originalUri === '') {
-            return;
-        }
+        try {
+            if ($originalUri === '') {
+                return;
+            }
 
-        if (str_contains($originalUri, 'master.m3u8')) {
-            $clientIdentifier = (string) ($token ?? $request->ip() ?? 'unknown');
-            $usageService->recordPlaybackView((string) $video->tenant_id, (string) $video->id, $clientIdentifier);
-        }
+            if (str_contains($originalUri, 'master.m3u8')) {
+                $clientIdentifier = (string) ($token ?? $request->ip() ?? 'unknown');
+                $usageService->recordPlaybackView((string) $video->tenant_id, (string) $video->id, $clientIdentifier);
+            }
 
-        if (str_ends_with($originalUri, '.ts') || str_contains($originalUri, '.ts?')) {
-            $usageService->recordPlaybackEgress((string) $video->tenant_id, 1572864);
+            if (str_ends_with($originalUri, '.ts') || str_contains($originalUri, '.ts?')) {
+                $usageService->recordPlaybackEgress(
+                    (string) $video->tenant_id,
+                    TenantUsageServiceInterface::DEFAULT_SEGMENT_ESTIMATE_BYTES
+                );
+            }
+        } catch (Throwable $e) {
+            Log::warning('Playback usage metering failed: '.$e->getMessage());
         }
     }
 }

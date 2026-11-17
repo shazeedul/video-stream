@@ -96,4 +96,37 @@ final class AggregateUsageCommandTest extends TestCase
             'egress_bytes' => 2097152,
         ]);
     }
+
+    public function test_aggregation_preserves_existing_view_count_and_egress_when_redis_keys_are_expired_or_null(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $targetDate = '2026-11-01';
+
+        // Pre-existing historical record with established metrics
+        TenantUsageRecord::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'date' => $targetDate,
+            'storage_bytes' => 5242880,
+            'egress_bytes' => 9999999,
+            'view_count' => 1234,
+            'video_count' => 5,
+        ]);
+
+        // Redis has no keys for this past date (expired / null)
+        $this->assertNull(Redis::get("tenant:{$tenant->id}:views:{$targetDate}"));
+        $this->assertNull(Redis::get("tenant:{$tenant->id}:egress:{$targetDate}"));
+
+        $this->artisan('usage:aggregate-bandwidth', ['--date' => $targetDate])
+            ->assertSuccessful();
+
+        $record = TenantUsageRecord::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->where('date', $targetDate)
+            ->first();
+
+        $this->assertNotNull($record);
+        // Metric preservation: view_count and egress_bytes must NOT be zeroed out
+        $this->assertSame(1234, $record->view_count);
+        $this->assertSame(9999999, $record->egress_bytes);
+    }
 }

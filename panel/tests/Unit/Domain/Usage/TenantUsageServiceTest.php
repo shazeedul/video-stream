@@ -210,3 +210,45 @@ test('recalculateTenantStorage updates or creates TenantUsageRecord and returns 
     expect($record->video_count)->toBe(1);
     expect($tenant->usageRecords)->toHaveCount(1);
 });
+
+test('calculation excludes expired in-flight upload sessions from storage', function (): void {
+    $tenant = Tenant::factory()->create();
+    $video = Video::factory()->forTenant($tenant)->create();
+
+    // Active upload session not expired: 2 parts * 5MB = 10MB
+    UploadSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'video_id' => $video->id,
+        'status' => UploadSessionStatus::UPLOADING,
+        'part_size' => 5_000_000,
+        'total_parts' => 2,
+        'expires_at' => now()->addHour(),
+    ]);
+
+    // Active upload session also not expired (future expiration): 1 part * 3MB = 3MB
+    UploadSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'video_id' => $video->id,
+        'status' => UploadSessionStatus::PENDING,
+        'part_size' => 3_000_000,
+        'total_parts' => 1,
+        'expires_at' => now()->addMinutes(30),
+    ]);
+
+    // Expired upload session: should NOT be included
+    UploadSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'video_id' => $video->id,
+        'status' => UploadSessionStatus::UPLOADING,
+        'part_size' => 8_000_000,
+        'total_parts' => 2,
+        'expires_at' => now()->subHour(),
+    ]);
+
+    /** @var TenantUsageServiceInterface $service */
+    $service = app(TenantUsageServiceInterface::class);
+    $totalStorage = $service->getCurrentStorageBytes($tenant);
+
+    // Only 10MB + 3MB = 13MB, expired 16MB is excluded
+    expect($totalStorage)->toBe(13_000_000);
+});

@@ -6,10 +6,14 @@ namespace Tests\Feature\Api\Internal;
 
 use App\Domain\Playback\Contracts\PlaybackTokenServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
+use App\Domain\Usage\Contracts\TenantUsageServiceInterface;
 use App\Domain\Videos\Models\Video;
 use App\Enums\VideoStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
+use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 final class PlaybackUsageTrackingTest extends TestCase
@@ -134,5 +138,35 @@ final class PlaybackUsageTrackingTest extends TestCase
 
         $response2->assertStatus(403);
         $this->assertSame(0, (int) Redis::get("tenant:{$tenant->id}:egress:{$date}"));
+    }
+
+    public function test_playback_auth_fails_open_and_returns_200_if_usage_recording_throws(): void
+    {
+        Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(fn (string $message) => str_contains($message, 'Playback usage metering failed'));
+
+        $tenant = Tenant::factory()->create();
+        $video = Video::factory()->forTenant($tenant)->ready()->create();
+
+        $expiresAt = time() + 3600;
+        $token = $this->tokenService->generateToken((string) $video->id, $expiresAt);
+
+        $mockUsageService = Mockery::mock(TenantUsageServiceInterface::class);
+        $mockUsageService->shouldReceive('recordPlaybackView')
+            ->andThrow(new RuntimeException('Redis connection timeout'));
+        $this->app->instance(TenantUsageServiceInterface::class, $mockUsageService);
+
+        $response = $this->withHeaders([
+            'X-Original-URI' => "/playback/{$video->id}/master.m3u8",
+        ])->get("/api/v1/internal/playback/auth?video_id={$video->id}&token={$token}&expires={$expiresAt}");
+
+        $response->assertOk();
+        $response->assertHeader('X-Tenant-Id', $tenant->id);
+    }
+
+    public function test_default_segment_estimate_bytes_constant(): void
+    {
+        $this->assertSame(1_572_864, TenantUsageServiceInterface::DEFAULT_SEGMENT_ESTIMATE_BYTES);
     }
 }
