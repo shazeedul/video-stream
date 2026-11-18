@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -40,7 +41,9 @@ final class PlaybackAuthController extends Controller
         }
 
         /** @var Video|null $video */
-        $video = Video::withoutTenantScope()->find($videoId);
+        $video = Cache::remember("playback:video:{$videoId}", 60, function () use ($videoId) {
+            return Video::withoutTenantScope()->with('tenant')->find($videoId);
+        });
 
         if ($video === null || $video->status !== VideoStatus::READY) {
             return response('Video not ready or not found', 403);

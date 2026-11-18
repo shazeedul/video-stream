@@ -10,6 +10,7 @@ use App\Domain\Videos\Models\Video;
 use App\Enums\VideoStatus;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,7 +34,9 @@ final class PlaybackStreamController extends Controller
         }
 
         /** @var Video|null $video */
-        $video = Video::withoutTenantScope()->find($videoId);
+        $video = Cache::remember("playback:video:{$videoId}", 60, function () use ($videoId) {
+            return Video::withoutTenantScope()->with('tenant')->find($videoId);
+        });
 
         if ($video === null || $video->status !== VideoStatus::READY) {
             return response('Video not ready or not found', 404);
@@ -83,18 +86,35 @@ final class PlaybackStreamController extends Controller
         $disk = Storage::disk('minio-processed');
         $storagePath = "tenants/{$video->tenant_id}/videos/{$video->id}/hls/{$asset}";
 
-        if (! $disk->exists($storagePath)) {
-            return response('Asset not found', 404);
-        }
-
         $mimeType = str_ends_with($asset, '.m3u8')
             ? 'application/vnd.apple.mpegurl'
             : (str_ends_with($asset, '.ts') ? 'video/MP2T' : ($disk->mimeType($storagePath) ?? 'application/octet-stream'));
 
-        $stream = $disk->readStream($storagePath);
+        if ($request->isMethod('HEAD')) {
+            if (! $disk->exists($storagePath)) {
+                return response('Asset not found', 404);
+            }
+
+            $size = $disk->size($storagePath);
+
+            return response('', 200, [
+                'Content-Type' => $mimeType,
+                'Content-Length' => (string) $size,
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+                'Access-Control-Allow-Headers' => '*',
+                'Cache-Control' => str_ends_with($asset, '.m3u8') ? 'no-cache' : 'public, max-age=86400',
+            ]);
+        }
+
+        try {
+            $stream = $disk->readStream($storagePath);
+        } catch (Throwable) {
+            return response('Asset not found', 404);
+        }
 
         if ($stream === null) {
-            return response('Unable to open stream', 500);
+            return response('Asset not found', 404);
         }
 
         $size = $disk->size($storagePath);
@@ -107,14 +127,6 @@ final class PlaybackStreamController extends Controller
             'Access-Control-Allow-Headers' => '*',
             'Cache-Control' => str_ends_with($asset, '.m3u8') ? 'no-cache' : 'public, max-age=86400',
         ];
-
-        if ($request->isMethod('HEAD')) {
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-
-            return response('', 200, $headers);
-        }
 
         return new StreamedResponse(function () use ($stream): void {
             fpassthru($stream);

@@ -43,8 +43,18 @@ export function VideoPlayer({
             return;
         }
 
+        // Configure VHS buffering for YouTube-like aggressive preloading & smooth quality transitions
+        const vhsGlobal = (videojs as unknown as { Vhs?: Record<string, unknown> }).Vhs;
+        if (vhsGlobal) {
+            vhsGlobal.GOAL_BUFFER_LENGTH = 60; // Buffer up to 60s ahead
+            vhsGlobal.MAX_GOAL_BUFFER_LENGTH = 120; // Max buffer 120s ahead
+            vhsGlobal.BUFFER_LOW_WATER_LINE = 10;
+        }
+
         const videoElement = document.createElement('video-js');
         videoElement.classList.add('vjs-big-play-centered', 'vjs-16-9');
+        videoElement.setAttribute('preload', 'auto');
+        videoElement.setAttribute('playsinline', 'true');
         videoRef.current.appendChild(videoElement);
 
         const player = (playerRef.current = videojs(
@@ -54,6 +64,7 @@ export function VideoPlayer({
                 autoplay: autoplay ?? false,
                 muted: muted ?? false,
                 loop: loop ?? false,
+                preload: 'auto',
                 responsive: true,
                 fluid: true,
                 playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 2],
@@ -64,6 +75,16 @@ export function VideoPlayer({
                     },
                 ],
                 poster: poster || undefined,
+                html5: {
+                    vhs: {
+                        overrideNative: true,
+                        goalBufferLength: 60,
+                        maxGoalBufferLength: 120,
+                        bufferLowWaterLine: 10,
+                        smoothQualityChange: true,
+                        handlePartialData: true,
+                    },
+                },
             },
             () => {
                 onReadyRef.current?.(player);
