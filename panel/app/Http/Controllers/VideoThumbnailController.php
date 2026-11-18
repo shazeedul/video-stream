@@ -30,15 +30,27 @@ final class VideoThumbnailController extends Controller
     /**
      * Serve thumbnail by storage path (e.g. /storage/tenants/... or /tenants/...).
      */
-    public function showStorage(Request $request, string $path): Response
+    public function showStorage(Request $request, ?string $prefix = null, ?string $path = null): Response
     {
-        $normalizedPath = 'tenants/'.mb_ltrim($path, '/');
+        $rawPath = $path ?? (string) $request->route('path', '');
+        if ($rawPath === '') {
+            $uri = $request->path();
+            if (preg_match('#tenants/(.+)$#', $uri, $matches)) {
+                $rawPath = $matches[1];
+            }
+        }
+
+        $normalizedPath = 'tenants/'.mb_ltrim($rawPath, '/');
 
         return $this->respondWithFile($normalizedPath);
     }
 
     private function respondWithFile(string $path): Response
     {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         $disk = Storage::disk('thumbnails');
 
         if (! $disk->exists($path)) {
@@ -58,6 +70,14 @@ final class VideoThumbnailController extends Controller
             'Access-Control-Allow-Origin' => '*',
             'Cache-Control' => 'public, max-age=86400',
         ];
+
+        if (request()->isMethod('HEAD')) {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+
+            return response('', 200, $headers);
+        }
 
         return new StreamedResponse(function () use ($stream): void {
             fpassthru($stream);

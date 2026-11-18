@@ -49,20 +49,23 @@ final class PlaybackAuthController extends Controller
         $token = $request->query('token');
         $expires = $request->query('expires') !== null ? (int) $request->query('expires') : null;
 
-        if ($token !== null && $expires !== null && $playbackTokenService->validateToken((string) $video->id, (string) $token, $expires)) {
-            try {
-                $this->recordUsage($usageService, $video, $originalUri, is_string($token) ? $token : null, $request);
-            } catch (Throwable $e) {
-                Log::warning('Playback usage metering failed: '.$e->getMessage());
-            }
+        $authorized = false;
 
-            return response('', 200)->header('X-Tenant-Id', (string) $video->tenant_id);
+        if ($token !== null || $expires !== null) {
+            if ($token !== null && $expires !== null && $playbackTokenService->validateToken((string) $video->id, (string) $token, $expires)) {
+                $authorized = true;
+            }
+        } elseif ($video->visibility->isPublic() || $video->visibility->isUnlisted()) {
+            $authorized = true;
+        } else {
+            /** @var User|null $user */
+            $user = $request->user() ?? auth('sanctum')->user();
+            if ($user instanceof User && $video->tenant !== null && $user->isTenantMember($video->tenant)) {
+                $authorized = true;
+            }
         }
 
-        /** @var User|null $user */
-        $user = $request->user() ?? auth('sanctum')->user();
-
-        if ($user instanceof User && $video->tenant !== null && $user->isTenantMember($video->tenant)) {
+        if ($authorized) {
             try {
                 $this->recordUsage($usageService, $video, $originalUri, is_string($token) ? $token : null, $request);
             } catch (Throwable $e) {

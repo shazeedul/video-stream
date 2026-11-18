@@ -28,6 +28,10 @@ final class PlaybackStreamController extends Controller
         PlaybackTokenServiceInterface $playbackTokenService,
         TenantUsageServiceInterface $usageService,
     ): Response {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         /** @var Video|null $video */
         $video = Video::withoutTenantScope()->find($videoId);
 
@@ -40,7 +44,11 @@ final class PlaybackStreamController extends Controller
 
         $authorized = false;
 
-        if ($token !== null && $expires !== null && $playbackTokenService->validateToken((string) $video->id, (string) $token, $expires)) {
+        if ($token !== null || $expires !== null) {
+            if ($token !== null && $expires !== null && $playbackTokenService->validateToken((string) $video->id, (string) $token, $expires)) {
+                $authorized = true;
+            }
+        } elseif ($video->visibility->isPublic() || $video->visibility->isUnlisted()) {
             $authorized = true;
         } else {
             /** @var User|null $user */
@@ -99,6 +107,14 @@ final class PlaybackStreamController extends Controller
             'Access-Control-Allow-Headers' => '*',
             'Cache-Control' => str_ends_with($asset, '.m3u8') ? 'no-cache' : 'public, max-age=86400',
         ];
+
+        if ($request->isMethod('HEAD')) {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+
+            return response('', 200, $headers);
+        }
 
         return new StreamedResponse(function () use ($stream): void {
             fpassthru($stream);
