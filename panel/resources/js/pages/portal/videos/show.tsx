@@ -440,12 +440,12 @@ export default function VideoShow({ video, playback_url }: VideoShowProps) {
                                 {video.status === 'ready' && (playback_url || video.playback_url) ? (
                                     <VideoPlayer
                                         src={(playback_url || video.playback_url)!}
-                                        poster={video.thumbnail_path ?? undefined}
+                                        poster={video.thumbnail_url ?? (video.thumbnail_path ? `/thumbnails/${video.id}` : undefined)}
                                         title={video.title}
                                         className="size-full"
                                     />
-                                ) : video.thumbnail_path ? (
-                                    <img src={video.thumbnail_path} alt={video.title} className="size-full object-contain" />
+                                ) : (video.thumbnail_url || video.thumbnail_path) ? (
+                                    <img src={video.thumbnail_url || `/thumbnails/${video.id}`} alt={video.title} className="size-full object-contain" />
                                 ) : (
                                     <div className="flex size-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-neutral-900 to-black text-neutral-400">
                                         <div className="flex size-16 items-center justify-center rounded-full bg-neutral-800/80 ring-1 ring-white/10">

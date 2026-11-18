@@ -28,7 +28,8 @@
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_HOST" value="127.0.0.1" force="false"/>
         <env name="DB_PORT" value="5433" force="false"/>
-        <env name="DB_DATABASE" value="wiz_video"/>
+        <env name="DB_DATABASE" value="wiz_video_testing" force="true"/>
+        <server name="DB_DATABASE" value="wiz_video_testing" force="true"/>
         <env name="DB_USERNAME" value="wiz_user"/>
         <env name="DB_PASSWORD" value="secret"/>
         <env name="MAIL_MAILER" value="array"/>

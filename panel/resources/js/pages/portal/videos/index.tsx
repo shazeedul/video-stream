@@ -435,8 +435,8 @@ export default function VideosIndex({ videos, filters, stats }: VideosIndexProps
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
                                                     <div className="relative aspect-video w-20 shrink-0 overflow-hidden rounded border border-border/50 bg-neutral-900">
-                                                        {video.thumbnail_path ? (
-                                                            <img src={video.thumbnail_path} alt={video.title} className="size-full object-cover" />
+                                                        {video.thumbnail_url || video.thumbnail_path ? (
+                                                            <img src={video.thumbnail_url || (video.thumbnail_path ? `/thumbnails/${video.id}` : '')} alt={video.title} className="size-full object-cover" />
                                                         ) : (
                                                             <div className="flex size-full items-center justify-center bg-neutral-800 text-neutral-400">
                                                                 <VideoIcon className="size-4" />

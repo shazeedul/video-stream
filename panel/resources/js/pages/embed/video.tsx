@@ -17,7 +17,7 @@ export default function EmbedVideo({ video, playback_url, autoplay = false, mute
             <div className="fixed inset-0 m-0 flex size-full items-center justify-center overflow-hidden bg-black p-0">
                 <VideoPlayer
                     src={playback_url}
-                    poster={video.thumbnail_path ?? undefined}
+                    poster={video.thumbnail_url ?? (video.thumbnail_path ? `/thumbnails/${video.id}` : undefined)}
                     title={video.title}
                     autoplay={autoplay}
                     muted={muted}

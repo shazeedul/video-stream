@@ -19,3 +19,9 @@ Schedule::command('cleanup:users')
 Schedule::command('usage:aggregate-bandwidth')
     ->hourly()
     ->description('Aggregate Redis playback egress and views into daily tenant usage records');
+
+// Schedule sweep of pending media outbox messages to RabbitMQ
+Schedule::command('media:publish-outbox')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->description('Publish pending transactional outbox messages to RabbitMQ broker');

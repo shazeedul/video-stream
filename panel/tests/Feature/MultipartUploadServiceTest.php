@@ -2,15 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
+use App\Domain\Processing\Enums\OutboxStatus;
+use App\Domain\Processing\Models\MediaOutboxMessage;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Uploads\Models\UploadSession;
+use App\Domain\Uploads\Services\MinioMultipartUploadService;
 use App\Domain\Videos\Models\Video;
 use App\Domain\Videos\Models\VideoAsset;
 use App\Enums\AssetType;
 use App\Enums\UploadSessionStatus;
 use App\Enums\VideoStatus;
 use Aws\CommandInterface;
+use Aws\Result;
 use Aws\S3\S3Client;
 use GuzzleHttp\Psr7\Request;
 
@@ -127,6 +132,31 @@ test('generates presigned part urls with 1 hour expiration for valid part number
         ->and($urls[2])->toBe('http://127.0.0.1:9000/videos-original/part2?signature=def');
 });
 
+test('generates presigned part urls using configured presigned_endpoint', function (): void {
+    config(['filesystems.disks.minio.presigned_endpoint' => 'http://localhost:9000']);
+    config(['filesystems.disks.minio.endpoint' => 'http://minio:9000']);
+
+    $tenant = Tenant::factory()->create();
+    app()->instance('current_tenant', $tenant);
+    $video = Video::factory()->create(['tenant_id' => $tenant->id]);
+
+    $session = UploadSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'video_id' => $video->id,
+        'upload_id' => 'upload-xyz-presign',
+        'total_parts' => 2,
+        'status' => UploadSessionStatus::PENDING,
+        'expires_at' => now()->addHours(24),
+    ]);
+
+    $service = app(MultipartUploadServiceInterface::class);
+    $urls = $service->getPresignedPartUrls($session, [1]);
+
+    expect($urls)->toBeArray()
+        ->and($urls)->toHaveKey(1)
+        ->and($urls[1])->toStartWith('http://localhost:9000/videos-original/');
+});
+
 test('presigned part urls throws exception when session is not active or expired', function (): void {
     $tenant = Tenant::factory()->create();
     app()->instance('current_tenant', $tenant);
@@ -233,6 +263,51 @@ test('complete upload calls completeMultipartUpload and records original video a
         ->and($asset->object_key)->toBe($session->object_key)
         ->and($asset->size_bytes)->toBe(12 * 1024 * 1024)
         ->and($asset->mime_type)->toBe('video/mp4');
+});
+
+test('complete upload publishes outbox message immediately when publisher is available', function (): void {
+    $tenant = Tenant::factory()->create();
+    app()->instance('current_tenant', $tenant);
+    $video = Video::factory()->create(['tenant_id' => $tenant->id]);
+
+    $session = UploadSession::factory()->create([
+        'tenant_id' => $tenant->id,
+        'video_id' => $video->id,
+        'upload_id' => 'upload-xyz-publish',
+        'object_key' => 'tenants/t1/videos/v1/source.mp4',
+        'total_parts' => 1,
+        'status' => UploadSessionStatus::PENDING,
+        'expires_at' => now()->addHours(24),
+    ]);
+
+    $mockPublisher = Mockery::mock(RabbitMQPublisherInterface::class);
+    $mockPublisher->shouldReceive('publish')
+        ->once()
+        ->withArgs(function ($exchange, $routingKey, $payload) use ($video) {
+            return $exchange === 'media.direct'
+                && $routingKey === 'media.process'
+                && $payload['video_id'] === $video->id;
+        });
+
+    $mockS3 = Mockery::mock(S3Client::class);
+    $mockS3->shouldReceive('completeMultipartUpload')->once()->andReturn(new Result([]));
+    $mockS3->shouldReceive('headObject')->once()->andReturn(new Result([
+        'ContentLength' => 5 * 1024 * 1024,
+        'ContentType' => 'video/mp4',
+    ]));
+
+    $service = new MinioMultipartUploadService(
+        disk: 'minio',
+        defaultClient: $mockS3,
+        publisher: $mockPublisher,
+    );
+
+    $service->completeUpload($session, [['PartNumber' => 1, 'ETag' => '"etag1"']]);
+
+    $outbox = MediaOutboxMessage::where('aggregate_id', $video->id)->first();
+    expect($outbox)->not->toBeNull()
+        ->and($outbox->status)->toBe(OutboxStatus::PUBLISHED)
+        ->and($outbox->published_at)->not->toBeNull();
 });
 
 test('complete upload throws exception when session is not pending or parts array is invalid', function (): void {

@@ -51,6 +51,8 @@ return [
      */
     'url' => env('APP_URL', 'http://localhost'),
 
+    'playback_url' => env('PLAYBACK_URL'),
+
     /*
      * |--------------------------------------------------------------------------
      * | Application Timezone

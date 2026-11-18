@@ -77,9 +77,9 @@ export function VideoCard({ video, onEdit, onDelete, canEdit = true, canDelete =
         <Card className="group overflow-hidden border border-border/70 bg-card p-0 transition-all duration-200 hover:border-primary/40 hover:shadow-md">
             {/* Thumbnail Header */}
             <div className="relative aspect-video w-full overflow-hidden bg-neutral-900">
-                {video.thumbnail_path && !imageError ? (
+                {(video.thumbnail_url || video.thumbnail_path) && !imageError ? (
                     <img
-                        src={video.thumbnail_path}
+                        src={video.thumbnail_url || (video.thumbnail_path ? `/thumbnails/${video.id}` : '')}
                         alt={video.title}
                         className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
                         onError={() => setImageError(true)}

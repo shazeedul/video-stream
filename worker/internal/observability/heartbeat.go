@@ -90,7 +90,7 @@ func NewHeartbeatPublisher(url, secret string, logger *slog.Logger, opts ...Hear
 		url:        url,
 		secret:     secret,
 		interval:   15 * time.Second,
-		httpClient: &http.Client{Timeout: 5 * time.Second},
+		httpClient: &http.Client{Timeout: 10 * time.Second},
 		logger:     logger,
 	}
 
@@ -157,7 +157,7 @@ func (hp *HeartbeatPublisher) Start(ctx context.Context) {
 	)
 
 	// Send initial active heartbeat immediately
-	initCtx, initCancel := context.WithTimeout(ctx, 5*time.Second)
+	initCtx, initCancel := context.WithTimeout(ctx, 10*time.Second)
 	if err := hp.Send(initCtx, "active"); err != nil {
 		hp.logger.Warn("initial heartbeat failed", "error", err, "worker_id", hp.workerID)
 	}
@@ -177,7 +177,7 @@ func (hp *HeartbeatPublisher) Start(ctx context.Context) {
 			stopCancel()
 			return
 		case <-ticker.C:
-			tickCtx, tickCancel := context.WithTimeout(ctx, 5*time.Second)
+			tickCtx, tickCancel := context.WithTimeout(ctx, 10*time.Second)
 			if err := hp.Send(tickCtx, "active"); err != nil {
 				hp.logger.Warn("periodic heartbeat failed", "error", err, "worker_id", hp.workerID)
 			}

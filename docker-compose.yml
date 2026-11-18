@@ -68,6 +68,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_PRESIGNED_ENDPOINT: "${MINIO_PRESIGNED_ENDPOINT:-http://localhost:9000}"
       MINIO_URL: http://localhost:9000/videos-original
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -97,6 +98,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_USE_SSL: "false"
       INTERNAL_CALLBACK_URL: http://panel:8000/api/v1/internal/processing/callback
+      INTERNAL_HEARTBEAT_URL: http://panel:8000/api/v1/internal/worker/heartbeat
       INTERNAL_API_SECRET: "${INTERNAL_API_SECRET:-internal-worker-secret-key-12345}"
       CONCURRENCY: 2
     depends_on:

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Uploads\Services;
 
+use App\Domain\Processing\Contracts\RabbitMQPublisherInterface;
 use App\Domain\Processing\Models\MediaOutboxMessage;
 use App\Domain\Uploads\Contracts\MultipartUploadServiceInterface;
 use App\Domain\Uploads\Models\UploadSession;
@@ -15,6 +16,7 @@ use App\Enums\VideoStatus;
 use Aws\S3\S3Client;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -38,6 +40,8 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
     public function __construct(
         private readonly string $disk = 'minio',
         private readonly ?S3Client $defaultClient = null,
+        private ?S3Client $presignClient = null,
+        private readonly ?RabbitMQPublisherInterface $publisher = null,
     ) {}
 
     /**
@@ -100,7 +104,7 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
             throw new DomainException('Upload session is not active or has expired.');
         }
 
-        $s3 = $this->resolveClient($client);
+        $s3 = $this->resolvePresignClient($client);
         $bucket = $this->getBucket();
         $urls = [];
 
@@ -218,7 +222,8 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
             // S3 mock or network may not provide headObject
         }
 
-        return DB::transaction(function () use ($session, $sizeBytes, $mimeType, $bucket): Video {
+        /** @var array{video: Video, outbox: MediaOutboxMessage} $result */
+        $result = DB::transaction(function () use ($session, $sizeBytes, $mimeType, $bucket): array {
             VideoAsset::create([
                 'video_id' => $session->video_id,
                 'type' => AssetType::ORIGINAL,
@@ -237,7 +242,7 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
             $video = $session->video;
             $video->update(['status' => VideoStatus::QUEUED]);
 
-            MediaOutboxMessage::create([
+            $outbox = MediaOutboxMessage::create([
                 'event_type' => 'video.uploaded',
                 'aggregate_type' => 'video',
                 'aggregate_id' => $video->id,
@@ -252,8 +257,24 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
                 ],
             ]);
 
-            return $video->fresh(['assets', 'uploadSessions']) ?? $video;
+            return [
+                'video' => $video->fresh(['assets', 'uploadSessions']) ?? $video,
+                'outbox' => $outbox,
+            ];
         });
+
+        if ($this->publisher !== null) {
+            try {
+                $exchange = (string) config('rabbitmq.exchange', 'media.direct');
+                $routingKey = (string) config('rabbitmq.routing_key', 'media.process');
+                $this->publisher->publish($exchange, $routingKey, $result['outbox']->payload);
+                $result['outbox']->markPublished();
+            } catch (Throwable $e) {
+                Log::warning("Failed to immediately publish outbox message {$result['outbox']->id}: {$e->getMessage()}");
+            }
+        }
+
+        return $result['video'];
     }
 
     /**
@@ -306,6 +327,46 @@ final class MinioMultipartUploadService implements MultipartUploadServiceInterfa
         $filesystem = Storage::disk($this->disk);
 
         return $filesystem->getClient();
+    }
+
+    /**
+     * Resolve the AWS S3 client to use specifically for generating presigned URLs.
+     */
+    private function resolvePresignClient(?S3Client $client = null): S3Client
+    {
+        if ($client !== null) {
+            return $client;
+        }
+
+        if ($this->presignClient !== null) {
+            return $this->presignClient;
+        }
+
+        if ($this->defaultClient !== null) {
+            return $this->defaultClient;
+        }
+
+        /** @var string|null $presignedEndpoint */
+        $presignedEndpoint = config("filesystems.disks.{$this->disk}.presigned_endpoint");
+
+        if (empty($presignedEndpoint)) {
+            return $this->resolveClient();
+        }
+
+        $diskConfig = config("filesystems.disks.{$this->disk}", []);
+
+        $this->presignClient = new S3Client([
+            'version' => 'latest',
+            'region' => (string) ($diskConfig['region'] ?? 'us-east-1'),
+            'endpoint' => (string) $presignedEndpoint,
+            'use_path_style_endpoint' => (bool) ($diskConfig['use_path_style_endpoint'] ?? true),
+            'credentials' => [
+                'key' => (string) ($diskConfig['key'] ?? ''),
+                'secret' => (string) ($diskConfig['secret'] ?? ''),
+            ],
+        ]);
+
+        return $this->presignClient;
     }
 
     /**

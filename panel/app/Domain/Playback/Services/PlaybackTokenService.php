@@ -51,6 +51,6 @@ final class PlaybackTokenService implements PlaybackTokenServiceInterface
 
     private function resolveBaseUrl(): string
     {
-        return $this->baseUrl ?? (string) config('app.url', 'http://localhost:8088');
+        return $this->baseUrl ?? (string) (config('app.playback_url') ?: config('app.url', 'http://localhost:8088'));
     }
 }

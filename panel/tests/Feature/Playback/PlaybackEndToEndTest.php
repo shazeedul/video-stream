@@ -7,6 +7,8 @@ namespace Tests\Feature\Playback;
 use App\Domain\Playback\Contracts\PlaybackTokenServiceInterface;
 use App\Domain\Tenants\Models\Tenant;
 use App\Domain\Videos\Models\Video;
+use App\Enums\VideoStatus;
+use App\Enums\VideoVisibility;
 use App\Models\User;
 use Aws\S3\S3Client;
 use Illuminate\Support\Facades\Http;
@@ -31,6 +33,14 @@ final class PlaybackEndToEndTest extends TestCase
     {
         parent::setUp();
 
+        $panelDatabase = env('PANEL_DB_DATABASE', 'wiz_video');
+        config([
+            'database.connections.panel_db' => array_merge(
+                config('database.connections.pgsql'),
+                ['database' => $panelDatabase]
+            ),
+        ]);
+
         $this->ensureMinioBucketPolicy();
     }
 
@@ -43,16 +53,17 @@ final class PlaybackEndToEndTest extends TestCase
             }
 
             if ($this->testVideo !== null) {
-                $this->testVideo->assets()->delete();
-                $this->testVideo->uploadSessions()->delete();
+                $this->testVideo->setConnection('panel_db');
                 $this->testVideo->delete();
             }
 
             if ($this->testUser !== null) {
+                $this->testUser->setConnection('panel_db');
                 $this->testUser->delete();
             }
 
             if ($this->testTenant !== null) {
+                $this->testTenant->setConnection('panel_db');
                 $this->testTenant->delete();
             }
         } catch (Throwable) {
@@ -64,15 +75,28 @@ final class PlaybackEndToEndTest extends TestCase
 
     public function test_end_to_end_nginx_authorizes_and_streams_hls_assets_from_minio(): void
     {
-        $this->testTenant = Tenant::factory()->create();
-        $this->testUser = User::factory()->create();
-        $this->testVideo = Video::factory()
-            ->forTenant($this->testTenant)
-            ->ready()
-            ->public()
-            ->create([
-                'user_id' => $this->testUser->id,
-            ]);
+        $tenantData = Tenant::factory()->raw();
+        $this->testTenant = new Tenant();
+        $this->testTenant->setConnection('panel_db');
+        $this->testTenant->fill($tenantData);
+        $this->testTenant->save();
+
+        $userData = User::factory()->raw();
+        $this->testUser = new User();
+        $this->testUser->setConnection('panel_db');
+        $this->testUser->fill($userData);
+        $this->testUser->save();
+
+        $this->testVideo = new Video();
+        $this->testVideo->setConnection('panel_db');
+        $this->testVideo->fill([
+            'tenant_id' => $this->testTenant->id,
+            'user_id' => $this->testUser->id,
+            'title' => 'E2E Playback Video',
+            'status' => VideoStatus::READY,
+            'visibility' => VideoVisibility::PUBLIC,
+        ]);
+        $this->testVideo->save();
 
         $hlsPrefix = "tenants/{$this->testTenant->id}/videos/{$this->testVideo->id}/hls";
 
@@ -129,14 +153,28 @@ M3U8;
 
     public function test_nginx_playback_rejects_unauthorized_requests(): void
     {
-        $this->testTenant = Tenant::factory()->create();
-        $this->testUser = User::factory()->create();
-        $this->testVideo = Video::factory()
-            ->forTenant($this->testTenant)
-            ->ready()
-            ->create([
-                'user_id' => $this->testUser->id,
-            ]);
+        $tenantData = Tenant::factory()->raw();
+        $this->testTenant = new Tenant();
+        $this->testTenant->setConnection('panel_db');
+        $this->testTenant->fill($tenantData);
+        $this->testTenant->save();
+
+        $userData = User::factory()->raw();
+        $this->testUser = new User();
+        $this->testUser->setConnection('panel_db');
+        $this->testUser->fill($userData);
+        $this->testUser->save();
+
+        $this->testVideo = new Video();
+        $this->testVideo->setConnection('panel_db');
+        $this->testVideo->fill([
+            'tenant_id' => $this->testTenant->id,
+            'user_id' => $this->testUser->id,
+            'title' => 'E2E Unauthorized Video',
+            'status' => VideoStatus::READY,
+            'visibility' => VideoVisibility::PUBLIC,
+        ]);
+        $this->testVideo->save();
 
         /** @var PlaybackTokenServiceInterface $tokenService */
         $tokenService = app(PlaybackTokenServiceInterface::class);

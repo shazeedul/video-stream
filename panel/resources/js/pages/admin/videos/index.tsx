@@ -236,9 +236,9 @@ export default function Index({ videos, tenants, filters }: Props) {
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
                                                 <div className="flex h-10 w-14 shrink-0 items-center justify-center overflow-hidden rounded bg-muted/60 text-muted-foreground border">
-                                                    {video.thumbnail_path ? (
+                                                    {video.thumbnail_url || video.thumbnail_path ? (
                                                         <img
-                                                            src={`/storage/${video.thumbnail_path}`}
+                                                            src={video.thumbnail_url || (video.thumbnail_path ? `/storage/${video.thumbnail_path}` : '')}
                                                             alt={video.title}
                                                             className="h-full w-full object-cover"
                                                         />

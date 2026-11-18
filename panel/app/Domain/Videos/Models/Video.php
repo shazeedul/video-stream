@@ -48,6 +48,27 @@ final class Video extends Model
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var list<string>
+     */
+    protected $appends = [
+        'thumbnail_url',
+    ];
+
+    /**
+     * Get the publicly accessible thumbnail URL.
+     */
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        if (empty($this->thumbnail_path)) {
+            return null;
+        }
+
+        return url("/thumbnails/{$this->id}");
+    }
+
+    /**
      * The user who created the video.
      */
     public function user(): BelongsTo
