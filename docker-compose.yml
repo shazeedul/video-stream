@@ -59,7 +59,7 @@ services:
       APP_KEY: "base64://BGXoPICIxkq9zyDW2K6i3qZ6vtusvZP0pxFGLJIJw="
       APP_DEBUG: "true"
       APP_URL: "http://localhost:${PANEL_PORT:-8080}"
-      PLAYBACK_URL: "${PLAYBACK_URL:-http://localhost:8088}"
+      PLAYBACK_URL: "${PLAYBACK_URL:-http://localhost:8080}"
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
