@@ -1,11 +1,8 @@
 # Root .gitignore for monorepo
 
 # Local environment & secrets
-.env
-.env.*
 !.env.example
 .env.backup
-.env.local
 *.key
 *.pem
 
@@ -42,7 +39,7 @@ infrastructure/backups/
 
 # IDEs
 .idea/
-.vscode/
 *.swp
 *.swo
 .build/
+config.bat
