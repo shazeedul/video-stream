@@ -47,6 +47,10 @@ final class VideoThumbnailController extends Controller
 
     private function respondWithFile(string $path): Response
     {
+        if (str_contains($path, '..') || str_contains($path, "\0")) {
+            return response('Invalid path', 400);
+        }
+
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_write_close();
         }
