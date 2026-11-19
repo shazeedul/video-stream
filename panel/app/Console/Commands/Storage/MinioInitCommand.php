@@ -40,44 +40,11 @@ final class MinioInitCommand extends Command
                     $this->info("Bucket [{$bucket}] created successfully.");
                 }
 
-                $client->putBucketCors([
-                    'Bucket' => $bucket,
-                    'CORSConfiguration' => [
-                        'CORSRules' => [
-                            [
-                                'AllowedHeaders' => ['*'],
-                                'AllowedMethods' => ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
-                                'AllowedOrigins' => ['*'],
-                                'ExposeHeaders' => ['ETag'],
-                                'MaxAgeSeconds' => 3000,
-                            ],
-                        ],
-                    ],
-                ]);
-                $this->line("CORS configured for bucket [{$bucket}].");
+                $this->configureBucket($client, $bucket);
             } catch (S3Exception $e) {
                 if (in_array($e->getAwsErrorCode(), ['BucketAlreadyOwnedByYou', 'BucketAlreadyExists'], true)) {
                     $this->line("Bucket [{$bucket}] already exists.");
-
-                    try {
-                        $client->putBucketCors([
-                            'Bucket' => $bucket,
-                            'CORSConfiguration' => [
-                                'CORSRules' => [
-                                    [
-                                        'AllowedHeaders' => ['*'],
-                                        'AllowedMethods' => ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
-                                        'AllowedOrigins' => ['*'],
-                                        'ExposeHeaders' => ['ETag'],
-                                        'MaxAgeSeconds' => 3000,
-                                    ],
-                                ],
-                            ],
-                        ]);
-                        $this->line("CORS configured for bucket [{$bucket}].");
-                    } catch (Throwable $corsError) {
-                        $this->warn("Could not set CORS for bucket [{$bucket}]: {$corsError->getMessage()}");
-                    }
+                    $this->configureBucket($client, $bucket);
 
                     continue;
                 }
@@ -95,6 +62,65 @@ final class MinioInitCommand extends Command
         $this->info('MinIO buckets initialization complete.');
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Configure CORS and bucket policies.
+     */
+    private function configureBucket(S3Client $client, string $bucket): void
+    {
+        try {
+            $client->putBucketCors([
+                'Bucket' => $bucket,
+                'CORSConfiguration' => [
+                    'CORSRules' => [
+                        [
+                            'AllowedHeaders' => ['*'],
+                            'AllowedMethods' => ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
+                            'AllowedOrigins' => ['*'],
+                            'ExposeHeaders' => ['ETag'],
+                            'MaxAgeSeconds' => 3000,
+                        ],
+                    ],
+                ],
+            ]);
+            $this->line("CORS configured for bucket [{$bucket}].");
+        } catch (Throwable $corsError) {
+            $this->warn("Could not set CORS for bucket [{$bucket}]: {$corsError->getMessage()}");
+        }
+
+        $processedBucket = (string) config('filesystems.disks.minio-processed.bucket', 'videos-processed');
+        if ($bucket === $processedBucket) {
+            try {
+                $policy = json_encode([
+                    'Version' => '2012-10-17',
+                    'Statement' => [
+                        [
+                            'Effect' => 'Allow',
+                            'Principal' => ['AWS' => ['*']],
+                            'Action' => ['s3:GetBucketLocation', 's3:ListBucket'],
+                            'Resource' => ["arn:aws:s3:::{$bucket}"],
+                        ],
+                        [
+                            'Effect' => 'Allow',
+                            'Principal' => ['AWS' => ['*']],
+                            'Action' => ['s3:GetObject'],
+                            'Resource' => ["arn:aws:s3:::{$bucket}/*"],
+                        ],
+                    ],
+                ]);
+
+                if ($policy !== false) {
+                    $client->putBucketPolicy([
+                        'Bucket' => $bucket,
+                        'Policy' => $policy,
+                    ]);
+                    $this->line("Read policy configured for bucket [{$bucket}].");
+                }
+            } catch (Throwable $policyError) {
+                $this->warn("Could not set policy for bucket [{$bucket}]: {$policyError->getMessage()}");
+            }
+        }
     }
 
     /**
