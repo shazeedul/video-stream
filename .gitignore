@@ -31,3 +31,4 @@ infrastructure/backups/
 .vscode/
 *.swp
 *.swo
+.build/
