@@ -44,7 +44,7 @@ jobs:
         with:
           gemini-key: ${{ secrets.GEMINI_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          model: 'gemini-2.5-pro'
+          model: 'gemini-3.1-pro-preview'
           context-lines: 10
           prompt: |
             You are an expert software engineer and senior security reviewer for a video streaming platform.
