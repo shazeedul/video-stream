@@ -1,0 +1,63 @@
+name: Gemini Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - '**.md'
+      - '**.lock'
+      - 'pnpm-lock.yaml'
+      - 'go.sum'
+      - '**.svg'
+      - '**.png'
+      - '**.jpg'
+      - '**.ico'
+      - 'public/build/**'
+
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Gemini PR Code Review
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && (contains(github.event.comment.body, '/gemini-review') || contains(github.event.comment.body, '/review')))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gemini Code Review
+        uses: sshnaidm/gemini-code-review-action@v2
+        with:
+          gemini-key: ${{ secrets.GEMINI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          model: 'gemini-2.5-pro'
+          context-lines: 10
+          prompt: |
+            You are an expert software engineer and senior security reviewer for a video streaming platform.
+            The stack consists of:
+            - Backend: Laravel 13 (PHP 8.4) with multi-tenancy, transactional outbox pattern, and Spatie authorization.
+            - Frontend: React 19, TypeScript, Inertia.js v2, Tailwind CSS, Video.js player.
+            - Worker: Go 1.23 media daemon using FFmpeg / FFprobe for single-pass multi-variant HLS transcoding.
+            - Infrastructure: Nginx reverse proxy, PostgreSQL 16, Redis 7, RabbitMQ 3, MinIO S3 object storage.
+
+            Review the code diff focusing on:
+            1. Correctness & Edge Cases: Logic errors, race conditions, nil/null pointer exceptions, resource leaks (unclosed streams, goroutines).
+            2. Security & Multi-tenancy: Tenant isolation scope checks, authorization policy enforcement, path traversal, injection risks, secret leakage.
+            3. Performance: Inefficient database queries (N+1), memory bloat during media uploads/streaming, unindexed queries, blocking operations.
+            4. Architecture & Idioms: Adherence to PSR-12/Pint in PHP, idiomatic Go concurrency/error handling, clean TypeScript/React component design.
+
+            Provide concise, constructive, and actionable feedback. When pointing out issues, explain the rationale and provide concrete drop-in code suggestions. If the changes look solid, provide a concise positive review summary.
