@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+vendor
+.env
+.env.*
+storage/logs/*.log
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+.phpunit.cache
+.phpunit.result.cache
+.idea
+.vscode
+.DS_Store
